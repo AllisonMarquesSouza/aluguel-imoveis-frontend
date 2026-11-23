@@ -5,7 +5,7 @@ import { Field } from '../ui.jsx';
 const towers = [[0, 150], [46, 230], [92, 180], [150, 290], [212, 200], [262, 260], [318, 170], [372, 240]];
 
 export default function Login() {
-  const { login } = useAuth();
+  const { login, notice } = useAuth();
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
   const [err, setErr] = useState('');
@@ -26,7 +26,7 @@ export default function Login() {
   return (
     <div className="login">
       <section className="login-art">
-        <div className="brand"><i />Meu Imóvel</div>
+        <div className="brand"><i aria-hidden="true" />Meu Imóvel</div>
         <h1>Cada imóvel merece o corretor certo.</h1>
         <p>Gerencie a equipe que apresenta seus imóveis ao público.</p>
         <svg viewBox="0 0 440 320" className="skyline" aria-hidden="true">
@@ -47,6 +47,7 @@ export default function Login() {
         <form onSubmit={submit}>
           <h2>Entrar</h2>
           <p className="muted">Acesso restrito à equipe.</p>
+          {notice && <p className="error" role="status">{notice}</p>}
           <Field label="E-mail">
             <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="username" required autoFocus />
           </Field>

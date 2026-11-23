@@ -1,0 +1,56 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  min-width: 320px;
+  min-height: 100%;
+  scroll-behavior: smooth;
+}
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+  background: var(--canvas);
+  color: var(--ink);
+  font-size: 16px;
+  line-height: 1.55;
+}
+
+#root { min-height: 100vh; }
+h1, h2, h3, p { margin: 0; }
+
+h1, h2, h3 {
+  color: var(--ink);
+  font-family: 'Bricolage Grotesque', 'Figtree', sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  line-height: 1.15;
+}
+
+h1 { font-size: clamp(1.85rem, 3vw, 2.55rem); }
+h2 { font-size: 1.4rem; }
+h3 { font-size: 1.08rem; }
+a { color: var(--teal); }
+small { color: var(--muted); font-size: 0.84rem; }
+.muted { color: var(--muted); }
+
+::selection { background: #bce8dd; color: var(--navy); }
+
+:focus-visible {
+  outline: 3px solid var(--teal-bright);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}

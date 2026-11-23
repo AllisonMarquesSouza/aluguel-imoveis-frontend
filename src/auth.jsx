@@ -1,57 +1,59 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
-import { api, getToken, setToken } from './api.js';
+import { api, getStoredProfile, getToken, setToken, setUnauthorizedHandler } from './api.js';
+import { can, readSession } from './auth-session.js';
 
 const Ctx = createContext(null);
 export const useAuth = () => useContext(Ctx);
+export { can };
 
-// Sem perfil no token, mostramos tudo e deixamos a API recusar o que não for permitido.
-export const can = (session, ...perfis) => !session?.perfil || perfis.includes(session.perfil);
+function loadInitialState() {
+  const token = getToken();
+  if (!token) return { session: null, notice: '' };
 
-function decode(token) {
-  try {
-    const b64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
-    return JSON.parse(decodeURIComponent(escape(atob(b64))));
-  } catch {
-    return null;
-  }
-}
+  const session = readSession(token, Date.now(), getStoredProfile());
+  if (session) return { session, notice: '' };
 
-// AJUSTE AQUI se o seu JWT guarda o perfil em outro claim.
-function readSession(token) {
-  const p = decode(token);
-  if (!p) return { nome: null, email: null, perfil: null, exp: null };
-  if (p.exp && p.exp * 1000 < Date.now()) return null;
-  const raw = p.perfil ?? p.role ?? p.roles?.[0] ?? p.authorities?.[0];
-  const perfil = (typeof raw === 'string' ? raw : raw?.authority)?.replace('ROLE_', '') ?? null;
-  return { nome: p.nome ?? p.name ?? null, email: p.email ?? p.sub ?? null, perfil, exp: p.exp ?? null };
+  setToken(null);
+  return { session: null, notice: 'Sua sessão expirou ou não é válida. Entre novamente.' };
 }
 
 export function AuthProvider({ children }) {
-  const [session, setSession] = useState(() => {
-    const t = getToken();
-    const s = t ? readSession(t) : null;
-    if (!s) setToken(null);
-    return s;
-  });
+  const [initial] = useState(loadInitialState);
+  const [session, setSession] = useState(initial.session);
+  const [notice, setNotice] = useState(initial.notice);
 
-  const login = useCallback(async (email, senha) => {
-    const { token } = await api.post('/auth/login', { email, senha }, { auth: false });
-    setToken(token);
-    setSession(readSession(token));
-  }, []);
-
-  const logout = useCallback(() => {
+  const logout = useCallback((message = '') => {
     setToken(null);
     setSession(null);
+    setNotice(message);
   }, []);
 
-  // O token dura 2h: sai sozinho quando expirar.
+  const handleUnauthorized = useCallback(() => {
+    logout('Sua sessão expirou. Entre novamente.');
+  }, [logout]);
+
+  useEffect(() => setUnauthorizedHandler(handleUnauthorized), [handleUnauthorized]);
+
+  const login = useCallback(async (email, senha) => {
+    setNotice('');
+    const { token, perfil } = await api.post('/auth/login', { email, senha }, { auth: false });
+    const nextSession = readSession(token, Date.now(), perfil);
+    if (!nextSession) throw new Error('A API retornou um token inválido ou expirado.');
+    setToken(token, nextSession.perfil);
+    setSession(nextSession);
+    if (!nextSession.perfil) {
+      setNotice('Login aceito, mas a API não informou o perfil desta conta. O painel ficará bloqueado até esse dado estar disponível.');
+    }
+    return nextSession;
+  }, []);
+
+  // O JWT da API expira em duas horas.
   useEffect(() => {
     if (!session?.exp) return;
     const ms = session.exp * 1000 - Date.now();
-    const id = setTimeout(logout, Math.max(ms, 0));
+    const id = setTimeout(() => logout('Sua sessão expirou. Entre novamente.'), Math.max(ms, 0));
     return () => clearTimeout(id);
   }, [session, logout]);
 
-  return <Ctx.Provider value={{ session, login, logout }}>{children}</Ctx.Provider>;
+  return <Ctx.Provider value={{ session, login, logout, notice }}>{children}</Ctx.Provider>;
 }
