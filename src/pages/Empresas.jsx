@@ -89,6 +89,22 @@ export default function Empresas() {
     }
   }
 
+  async function removeCompany(company) {
+    if (!confirm(`Remover a empresa "${company.nome}"? Essa ação não pode ser desfeita.`)) return;
+    setBusyId(company.id);
+    setError('');
+    try {
+      await api.delete(`/empresa/${company.id}`);
+      setCompanies((current) => current?.filter((item) => item.id !== company.id) ?? current);
+      show('Empresa removida.');
+      await load();
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   function finish(message) {
     setCreating(false);
     setEditing(null);
@@ -136,6 +152,9 @@ export default function Empresas() {
                       <button className="ghost" onClick={() => editCompany(company)} disabled={busyId === company.id}>Editar</button>
                       <button className="ghost" onClick={() => changeStatus(company)} disabled={busyId === company.id}>
                         {busyId === company.id ? 'Salvando…' : company.ativa ? 'Inativar' : 'Ativar'}
+                      </button>
+                      <button className="ghost danger" onClick={() => removeCompany(company)} disabled={busyId === company.id}>
+                        {busyId === company.id ? 'Aguarde…' : 'Remover'}
                       </button>
                     </div>
                   </td>
