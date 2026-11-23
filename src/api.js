@@ -1,11 +1,32 @@
-const BASE = import.meta.env.VITE_API_URL ?? '/api';
+const BASE = import.meta.env?.VITE_API_URL ?? '/api';
 const KEY = 'mi_token';
+// Perfil persistido apenas para restaurar a navegação; a API autoriza cada operação.
+const PROFILE_KEY = 'mi_perfil';
 
 let token = localStorage.getItem(KEY);
+let storedProfile = localStorage.getItem(PROFILE_KEY);
+let unauthorizedHandler = null;
 export const getToken = () => token;
-export function setToken(t) {
+export const getStoredProfile = () => storedProfile;
+export function setToken(t, perfil = null) {
   token = t;
-  t ? localStorage.setItem(KEY, t) : localStorage.removeItem(KEY);
+  if (t) {
+    localStorage.setItem(KEY, t);
+    storedProfile = typeof perfil === 'string' ? perfil : null;
+    if (storedProfile) localStorage.setItem(PROFILE_KEY, storedProfile);
+    else localStorage.removeItem(PROFILE_KEY);
+  } else {
+    localStorage.removeItem(KEY);
+    localStorage.removeItem(PROFILE_KEY);
+    storedProfile = null;
+  }
+}
+
+export function setUnauthorizedHandler(handler) {
+  unauthorizedHandler = handler;
+  return () => {
+    if (unauthorizedHandler === handler) unauthorizedHandler = null;
+  };
 }
 
 // As imagens vêm como URL relativa (/imagens/...): junte com a origem da API.
@@ -30,7 +51,8 @@ const FALLBACK = {
 
 async function request(method, path, { json, form, auth = true } = {}) {
   const headers = {};
-  if (auth && token) headers.Authorization = `Bearer ${token}`;
+  const requestToken = auth ? token : null;
+  if (requestToken) headers.Authorization = `Bearer ${requestToken}`;
   let body;
   if (form) body = form; // o browser define o boundary do multipart
   else if (json !== undefined) {
@@ -46,6 +68,7 @@ async function request(method, path, { json, form, auth = true } = {}) {
   }
 
   if (!res.ok) {
+    if (res.status === 401 && requestToken && token === requestToken) unauthorizedHandler?.();
     let message;
     try {
       message = (await res.json()).message;
@@ -60,6 +83,7 @@ export const api = {
   get: (path) => request('GET', path),
   post: (path, json, opts) => request('POST', path, { json, ...opts }),
   patch: (path) => request('PATCH', path),
+  delete: (path) => request('DELETE', path),
   form: (method, path, form) => request(method, path, { form }),
 };
 
