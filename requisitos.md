@@ -108,7 +108,7 @@ Os requisitos abaixo descrevem o comportamento esperado do painel. Eles não det
 
 - Permitir ao `ADMINISTRADOR` consultar e cadastrar empresas.
 - Exibir os dados cadastrais disponibilizados pela API, como nome, tipo, documento, CRECI, contatos, endereço, logomarca, descrição e cidades de atuação.
-- Permitir editar e ativar/desativar uma empresa quando essas operações estiverem disponíveis.
+- Permitir editar, ativar/desativar e remover uma empresa quando essas operações estiverem disponíveis.
 - Distinguir imobiliárias de corretores autônomos conforme os tipos definidos no backend.
 - Não disponibilizar a gestão global de empresas para gestores e corretores.
 
@@ -335,14 +335,14 @@ Uma funcionalidade só deve ser considerada concluída quando:
 - O JWT emitido pela API contém emissor, assunto (`sub`, o e-mail) e expiração; não contém o perfil. No checkout local da API consultado em 23/11/2026, `POST /auth/login` retorna `{ token, perfil }`, sendo `perfil` um dos valores de `UsuarioPerfil`. O front-end persiste esse perfil junto ao token somente para navegação; a API continua responsável por validar permissões em cada operação. Uma alteração de perfil pode exigir novo login para atualizar a navegação local.
 - A política de edição de imóveis, proprietários e usuários depende de operações de atualização que não estão presentes no contrato atual da API.
 - O requisito de gestão de contatos, contratos, parcelas, pagamentos e relatórios depende de esses domínios e suas regras serem definidos e disponibilizados pela API.
-- Há divergência sobre limites de upload: `application.properties` da API define 5 MB por arquivo e 50 MB por requisição, enquanto um trecho do README da API descreve 1 MB efetivo e o README deste front-end também cita 1 MB. Conferir se perfis ou configurações de implantação alteram os limites e alinhar a documentação antes de fixar a validação da interface.
+- Para o front-end, validar cada imagem/documento em até 5 MB e aceitar somente os formatos definidos para cada fluxo. A configuração da API consultada permite até 50 MB por requisição; manter os limites da interface alinhados aos validadores reais e revisar esta nota se o contrato mudar.
 - A área de mapas permanece opcional e sem decisão de biblioteca; não deve bloquear os formulários sem requisito específico.
 
 Decisões pendentes que alterem regra de negócio, autorização ou contrato devem ser coordenadas com a API antes da implementação correspondente.
 
 ## 10. Estado da implementação
 
-Este quadro é a linha de base do levantamento feito em 19/11/2026, antes da implementação de T-01 a T-06. O progresso atual dessas tarefas está em `docs/STATUS.md`; este quadro histórico registra as lacunas que motivaram o backlog abaixo.
+Este quadro registra o levantamento feito em 19/11/2026, antes da implementação de T-01 a T-06. Ele é histórico e não representa o estado atual do painel. Para saber o que já foi entregue, o que está parcial e quais são as pendências atuais, consulte `docs/STATUS.md`.
 
 Situações usadas neste quadro:
 
@@ -399,96 +399,97 @@ O inventário abaixo evita transformar requisitos de negócio em endpoints presu
 
 As conclusões sobre ausência de endpoints referem-se ao código/documentação disponíveis no repositório da API no levantamento acima. Revalidar esse inventário antes de iniciar cada integração, pois o backend pode evoluir.
 
-## 12. Backlog proposto
+## 12. Plano de trabalho do front-end
 
-As tarefas abaixo foram solicitadas para tornar visível o trabalho restante. São um backlog de requisitos, não tickets já criados. Cada integração deve ser conferida novamente no contrato da API antes da implementação.
+Esta lista separa o que já existe no painel do que ainda falta fazer. O andamento detalhado e as validações ficam em `docs/STATUS.md`. Quando uma tela depende de uma consulta ou operação que a API ainda não oferece, o bloqueio é indicado: o front não deve substituir isso por dados globais, IDs digitados ou regras simuladas.
 
-### Prioridade 0 — Sessão e escopo de acesso
+### Prioridade 0 — Sessão e navegação
 
-#### T-01 — Definir e implementar a identificação do usuário autenticado
+#### T-01 — Identificação e sessão do usuário — **Concluída**
 
-- **Escopo:** consumir `perfil` da resposta `POST /auth/login`, manter o dado durante a sessão e adaptar o `AuthProvider` e a leitura de sessão sem inferir perfil pelo e-mail.
-- **Dependência:** a instância da API usada pelo front-end deve expor o contrato `{ token, perfil }` verificado no checkout local; não inferir perfil pelo e-mail.
-- **Aceite:** cada perfil reconhecido corretamente; token inválido ou perfil desconhecido não libera navegação/ações condicionadas; API permanece como autoridade final; expiração e `401` retornam a interface ao login com mensagem compreensível.
+- **Já feito:** o login lê `{ token, perfil }` de `POST /auth/login`; a sessão restaura o perfil para a navegação e termina no logout ou após a expiração.
+- **Resultado esperado:** perfil ausente ou desconhecido não libera páginas protegidas; a API continua autorizando cada operação.
 
-#### T-02 — Corrigir painel e chamadas por perfil
+#### T-02 — Painel inicial e acesso por perfil — **Concluída**
 
-- **Escopo:** exibir atalhos e contagens relevantes ao perfil e chamar apenas endpoints autorizados para ele; deixar explícitos carregamento, erro e ausência de dados.
-- **Dependência:** T-01 para conhecer o perfil com segurança.
-- **Aceite:** não há chamada a `GET /empresa` por perfil sem permissão; falhas de uma fonte não desaparecem silenciosamente; contagens representam os dados efetivamente retornados pela API e não são apresentadas como indicadores de negócio sem contrato.
+- **Já feito:** menus, rotas e consultas consideram o perfil. Erros de carregamento podem ser vistos e repetidos.
+- **Resultado esperado:** o painel chama apenas rotas compatíveis com o perfil e não apresenta listas como indicadores de negócio sem contrato que as sustente.
 
-### Prioridade 1 — Gestão coberta pela API
+### Prioridade 1 — Administração e operação disponíveis
 
-#### T-03 — Criar administração de empresas e dados auxiliares
+#### T-03 — Empresas e cadastros auxiliares — **Parcial**
 
-- **Escopo:** construir telas de empresa para administrador, cobrindo consulta, cadastro de imobiliária/autônoma, edição e ativação/desativação conforme os contratos; oferecer cidades e características nos formulários que as usam.
-- **Dependência:** nenhuma lacuna de endpoint identificada para o escopo documentado; confirmar DTOs/permissões na API ao iniciar.
-- **Aceite:** operações respeitam o perfil de administrador, tratam upload de logomarca e estados assíncronos, e refletem o resultado retornado pela API.
+- **Já feito:** administrador consulta, cria e edita empresas, altera sua situação e gerencia logomarcas; também consulta e mantém cidades e características nas operações disponíveis.
+- **Falta no front:** adicionar a ação para remover empresa por `DELETE /empresa/{id}`, com confirmação explícita e apresentação dos erros retornados pelo servidor.
+- **Resultado esperado:** somente o administrador acessa essas telas; a lista reflete o resultado confirmado pela API.
 
-#### T-04 — Completar gestão de equipe e corretores
+#### T-04 — Equipe de corretores — **Parcial; aguardando uma lista segura**
 
-- **Escopo:** substituir a consulta pública global por uma origem apropriada à gestão da equipe, implementar ativação e revisar cadastro, foto e ações por perfil.
-- **Dependência:** a API precisa oferecer listagem da equipe limitada à empresa do gestor. Se edição de corretor permanecer no requisito, a API também precisa fornecer contrato de atualização.
-- **Aceite:** gestores veem e alteram somente corretores da própria empresa; corretores de outras empresas não aparecem na lista de gestão; ativação/desativação usa as operações reais e estados do servidor.
+- **Já feito:** gestor cadastra corretores com os dados e a foto exigidos pela API.
+- **Falta no front:** listar a equipe da empresa e permitir ativar/desativar os corretores exibidos.
+- **Bloqueio:** a listagem disponível é pública e global. A tela de gestão precisa de uma origem limitada à empresa do gestor; não deve usar a lista pública para escolher quem alterar.
+- **Resultado esperado:** o gestor só vê e altera corretores da própria empresa, e a situação exibida corresponde à resposta da API.
 
-#### T-05 — Completar administração de usuários
+#### T-05 — Cadastro e administração de usuários — **Parcial; há um ajuste de front pendente**
 
-- **Escopo:** manter o cadastro existente e implementar consulta, edição e situação conforme permissões aprovadas; incluir gestão pelo gestor somente se o backend oferecer essa autorização.
-- **Dependência:** novos contratos de API para listar/consultar/editar/status; o backend atual documenta somente registro pelo administrador.
-- **Aceite:** perfis, situação e vínculo empresarial correspondem à API; administrador não recebe vínculo de empresa; gestor não altera usuários fora da empresa autorizada.
+- **Já feito:** administrador cria contas por `POST /auth/register` e escolhe a empresa quando o perfil exige vínculo empresarial.
+- **Falta no front agora:** remover `CORRETOR` das opções do formulário genérico. Esse endpoint cria a conta, mas não o cadastro profissional de corretor; o cadastro completo continua no fluxo próprio do gestor.
+- **Falta depois:** criar consulta, edição e alteração de situação de usuários quando essas operações estiverem disponíveis para o painel. A gestão pelo gestor só entra no front dentro do escopo autorizado.
+- **Resultado esperado:** o formulário não cria contas de corretor incompletas; perfil, situação e vínculo são apresentados conforme a API.
 
-#### T-06 — Implementar gestão de proprietários
+#### T-06 — Consulta e cadastro de proprietários — **Parcial; edição depende de operação disponível**
 
-- **Escopo:** adicionar busca por nome/documento e cadastro PF/PJ usando as rotas existentes; apresentar as informações e erros retornados.
-- **Dependência:** busca e cadastro estão disponíveis; atualização depende de nova operação da API se a edição continuar sendo exigida.
-- **Aceite:** somente corretores autorizados operam dentro da empresa autenticada; documento e pessoa são exibidos conforme o DTO; falha de API preserva os demais dados preenchidos.
+- **Já feito:** corretor pesquisa por nome ou documento e cadastra proprietários pessoa física ou jurídica.
+- **Falta no front:** oferecer edição quando houver uma operação de atualização disponível; não simular a alteração localmente.
+- **Resultado esperado:** dados e mensagens vêm da API; se uma gravação falhar, os demais campos preenchidos continuam disponíveis.
 
-#### T-07 — Implementar prédios e acervo de imóveis
+#### T-07 — Prédios e acervo de imóveis — **Parcial**
 
-- **Escopo:** criar lista, detalhe e cadastro de prédios/imóveis, com formulários por natureza, usando proprietários, cidades, características, fotos e dados do prédio retornados pela API. Incluir as ações de publicação, situação e documentos destinadas ao gestor.
-- **Dependência:** endpoints atuais cobrem cadastro, consulta e gestão de publicação/situação/documentos. A edição de dados comuns de imóvel depende de contrato de atualização do backend.
-- **Aceite:** cada natureza envia somente seu bloco de DTO; o cliente não define empresa/corretor responsável nem calcula preço, disponibilidade ou transições; situação/publicação só mudam após resposta da API.
+- **Já feito:** corretor consulta e detalha imóveis e prédios; cadastra prédios e imóveis das quatro naturezas usando os respectivos campos, proprietário, características, fotos e endereço.
+- **Falta no front agora:** oferecer edição de prédio usando `PUT /predio/{id}`.
+- **Falta depois:** apresentar ao gestor as ações de publicação, situação e histórico a partir de uma lista e de detalhes autorizados. A edição de dados comuns do imóvel não tem operação de atualização na API atual.
+- **Resultado esperado:** cada natureza envia somente seu bloco de DTO; situação e publicação mudam na tela somente após confirmação da API.
 
-#### T-08 — Implementar loteamentos, quadras e lotes
+#### T-08 — Loteamentos, quadras e lotes — **Parcial**
 
-- **Escopo:** criar consulta hierárquica e formulários para loteamentos/quadras/lotes, reutilizando cadastro e consulta de imóveis.
-- **Dependência:** rotas atuais documentam as operações principais; depende das seleções de cidade, proprietário e fotos da T-07.
-- **Aceite:** empresa e cidade refletem o escopo autorizado; situação e contagens são exibidas como retornadas; o cliente não infere disponibilidade nem executa transições locais.
+- **Já feito:** corretor consulta a hierarquia e as contagens retornadas, cadastra loteamentos e quadras e inicia o cadastro de um lote na quadra escolhida.
+- **Falta no front depois:** oferecer ao gestor a consulta e a alteração de situação de lotes quando houver uma lista/detalhe autorizado para esse perfil.
+- **Resultado esperado:** situações e contagens são apresentadas como retornadas pela API; o front não calcula disponibilidade nem simula transições.
 
-#### T-09 — Completar telas de fotos e documentos
+#### T-09 — Fotos e documentos — **Parcial**
 
-- **Escopo:** adicionar gestão de imagens de empresas e imóveis, substituição/remoção permitidas e consulta/envio/substituição/download de documentos de imóveis.
-- **Dependência:** contratos de imagem/documento já documentados; confirmar limites efetivos e permissões antes de fixar validação no formulário.
-- **Aceite:** nomes das partes multipart, tipos, limites e permissões correspondem à API; erro de upload não apaga os demais campos preenchidos.
+- **Já feito:** administrador adiciona, substitui e remove logomarcas; corretor adiciona, substitui e remove fotos de imóveis, mantendo ao menos uma foto.
+- **Falta no front depois:** criar a área de documentos do imóvel para o gestor — listar, enviar, substituir e baixar — quando ele puder selecionar um imóvel autorizado. Incluir a logomarca da própria empresa na tela do gestor quando a sessão fornecer o contexto da empresa.
+- **Resultado esperado:** partes multipart, tipos, limites e operações seguem os contratos. Erros de envio não apagam dados já preenchidos. Não oferecer reordenação ou troca posterior de capa sem operação correspondente.
 
-### Prioridade 2 — Recursos dependentes de evolução da API
+### Prioridade 2 — Funcionalidades que aguardam contrato
 
-#### T-10 — Definir API e interface de contatos e atendimento
+As tarefas abaixo descrevem somente a parte futura do front. Não criar endpoints simulados nem dados falsos para concluí-las; iniciar cada interface quando houver contrato real para ela.
 
-- **Escopo:** definir primeiro DTOs, estados de atendimento, filtros, escopo por perfil/empresa e endpoints; depois implementar consulta e atualização no painel.
-- **Dependência:** evolução da API; os estados citados em RF-11 ainda não estão confirmados no contrato atual.
-- **Aceite:** filtros e estados usam enums oficiais; corretor/gestor só acessam contatos autorizados; interface cobre carregamento, erro, vazio e sucesso.
+#### T-10 — Contatos e atendimento — **Aguardando contrato**
 
-#### T-11 — Definir API e interface de contratos
+- **Falta no front quando disponível:** consultar contatos autorizados, filtrar pelos campos aceitos e registrar atendimentos usando os estados oficiais.
+- **Resultado esperado:** gestor e corretor veem apenas os dados permitidos; a tela cobre carregamento, vazio, erro e sucesso.
 
-- **Escopo:** especificar operações, DTOs, perfis e documentos de contratos na API; depois implementar consulta, criação e detalhe no painel.
-- **Dependência:** evolução da API, atualmente sem domínio/rotas de contrato.
-- **Aceite:** imóvel, cliente, corretor e empresa refletem vínculos da API; a interface não gera contrato ou cronograma como fonte de verdade.
+#### T-11 — Contratos — **Aguardando contrato**
 
-#### T-12 — Definir API e interface de parcelas e pagamentos
+- **Falta no front quando disponível:** consultar, cadastrar e detalhar contratos com os vínculos e documentos retornados pela API.
+- **Resultado esperado:** imóvel, cliente, corretor e empresa refletem os dados do servidor; o front não gera contratos nem cronogramas financeiros.
 
-- **Escopo:** especificar operações, estados, valores, formas de pagamento, comprovantes e permissões na API; depois implementar consulta e baixa.
-- **Dependência:** evolução da API, atualmente sem domínio/rotas financeiras.
-- **Aceite:** saldo, juros, atraso, parcelas e situação vêm da API; o cliente apenas envia a operação autorizada e apresenta o resultado.
+#### T-12 — Parcelas e pagamentos — **Aguardando contrato**
 
-#### T-13 — Definir API e interface de relatórios
+- **Falta no front quando disponível:** consultar parcelas e registrar pagamentos autorizados, apresentando valores, vencimentos, formas de pagamento e comprovantes retornados.
+- **Resultado esperado:** saldo, juros, atraso e situação são apresentados conforme calculados pela API.
 
-- **Escopo:** definir relatórios, filtros, dados e permissões na API e então criar as telas autorizadas.
-- **Dependência:** evolução da API, atualmente sem endpoints de relatórios.
-- **Aceite:** nenhum perfil recebe relatório fora do seu escopo; filtros e dados correspondem exatamente ao contrato.
+#### T-13 — Relatórios — **Aguardando contrato**
 
-#### T-14 — Padronizar estados, acessibilidade e cobertura automatizada
+- **Falta no front quando disponível:** apresentar os relatórios e filtros autorizados para cada perfil.
+- **Resultado esperado:** dados e totais vêm da API; nenhum perfil recebe relatório fora do seu escopo.
 
-- **Escopo:** após ampliar as telas, padronizar carregamento, sucesso, erro, vazio, 401/403 e sessão expirada; revisar teclado, foco, responsividade e mensagens; definir ferramenta de testes e scripts necessários.
-- **Dependência:** pode começar em paralelo às telas, usando os componentes existentes e sem adicionar biblioteca grande sem justificativa.
-- **Aceite:** fluxos críticos têm testes proporcionais ao risco; cenários de falta de permissão e erro são cobertos; scripts de validação disponíveis são executados e seus resultados registrados.
+### Prioridade 3 — Qualidade das telas existentes
+
+#### T-14 — Estados, acessibilidade, responsividade e testes — **Parcial**
+
+- **Já feito:** há estilos responsivos, foco visível e estados de carregamento/erro em várias páginas. `npm test` cobre sessão, permissões, consultas do painel, DTOs de imóvel e multipart repetido.
+- **Falta no front:** revisar todas as telas por teclado e leitor de tela; conferir foco e modais em telas menores; uniformizar carregamento, vazio, sucesso, erro e falta de permissão; ampliar testes para formulários, rotas protegidas e respostas vazias.
+- **Resultado esperado:** ações principais funcionam por teclado; mensagens não dependem só de cor; formulários preservam dados após falha; os testes cobrem os fluxos críticos sem reproduzir regras de negócio da API.

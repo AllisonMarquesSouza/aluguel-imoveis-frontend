@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { api, multipart } from '../api.js';
+import { api, assetUrl, multipart } from '../api.js';
 import { Field, Modal, useToast } from '../ui.jsx';
 
 const EMPTY_EMPRESA = {
@@ -31,6 +31,8 @@ const EMPTY_CORRETOR = {
 };
 
 const optionalText = (value) => value.trim() || null;
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+const IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
 export default function Empresas() {
   const [companies, setCompanies] = useState(null);
@@ -40,6 +42,7 @@ export default function Empresas() {
   const [error, setError] = useState('');
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [managingLogo, setManagingLogo] = useState(null);
   const [toast, show] = useToast();
 
   const load = useCallback(async () => {
@@ -93,6 +96,12 @@ export default function Empresas() {
     load();
   }
 
+  async function finishLogo(message) {
+    setManagingLogo(null);
+    show(message);
+    await load();
+  }
+
   return (
     <>
       <header className="page-head">
@@ -112,11 +121,12 @@ export default function Empresas() {
       {companies?.length > 0 && (
         <div className="table-wrap">
           <table className="data-table">
-            <thead><tr><th>Empresa</th><th>Tipo</th><th>Documento</th><th>Cidades</th><th>Situação</th><th>Ações</th></tr></thead>
+            <thead><tr><th>Empresa</th><th>Logomarca</th><th>Tipo</th><th>Documento</th><th>Cidades</th><th>Situação</th><th>Ações</th></tr></thead>
             <tbody>
               {companies.map((company) => (
                 <tr key={company.id}>
                   <td><strong>{company.nome}</strong><small>{company.email}</small></td>
+                  <td><div className="company-logo-cell">{company.logoMarcaUrl ? <img src={assetUrl(company.logoMarcaUrl)} alt={`Logomarca de ${company.nome}`} /> : <span className="muted">Sem logo</span>}<button className="ghost" onClick={() => setManagingLogo(company)}>Gerenciar</button></div></td>
                   <td>{company.tipo}</td>
                   <td>{company.tipoDocumento} · {company.documento}</td>
                   <td>{company.cidadesAtuacao?.map((city) => city.nome).join(', ') || '—'}</td>
@@ -138,9 +148,76 @@ export default function Empresas() {
 
       {creating && <EmpresaForm cities={cities} onClose={() => setCreating(false)} onDone={() => finish('Empresa cadastrada.')} />}
       {editing && <EditarEmpresa company={editing} cities={cities} onClose={() => setEditing(null)} onDone={() => finish('Empresa atualizada.')} />}
+      {managingLogo && <CompanyLogoForm company={managingLogo} onClose={() => setManagingLogo(null)} onDone={finishLogo} />}
       {toast}
     </>
   );
+}
+
+function CompanyLogoForm({ company, onClose, onDone }) {
+  const [file, setFile] = useState(null);
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const hasLogo = Boolean(company.logoMarcaUrl && company.logoImagemId);
+  const incompleteLogo = Boolean(company.logoMarcaUrl) !== Boolean(company.logoImagemId);
+
+  function validate(selected) {
+    if (!selected) return 'Selecione uma imagem.';
+    if (!IMAGE_TYPES.has(selected.type)) return 'Use uma imagem JPEG, PNG ou WebP.';
+    if (selected.size > MAX_IMAGE_SIZE) return 'A imagem pode ter no máximo 5 MB.';
+    return '';
+  }
+
+  async function submit(event) {
+    event.preventDefault();
+    const issue = validate(file);
+    if (issue) return setError(issue);
+    setBusy(true);
+    setError('');
+    try {
+      const form = new FormData();
+      form.append('arquivo', file);
+      const method = hasLogo ? 'PUT' : 'POST';
+      const path = hasLogo
+        ? `/imagens/EMPRESA/${company.id}/${encodeURIComponent(company.logoImagemId)}`
+        : `/imagens/EMPRESA/${company.id}`;
+      await api.form(method, path, form);
+      await onDone(hasLogo ? 'Logomarca substituída.' : 'Logomarca adicionada.');
+    } catch (e) {
+      setError(e.message);
+      setBusy(false);
+    }
+  }
+
+  async function remove() {
+    if (!hasLogo) return;
+    if (!confirm(`Remover a logomarca de ${company.nome}?`)) return;
+    setBusy(true);
+    setError('');
+    try {
+      await api.delete(`/imagens/EMPRESA/${company.id}/${encodeURIComponent(company.logoImagemId)}`);
+      await onDone('Logomarca removida.');
+    } catch (e) {
+      setError(e.message);
+      setBusy(false);
+    }
+  }
+
+  return <Modal title={`Logomarca · ${company.nome}`} onClose={onClose}>
+    <form className="form" onSubmit={submit}>
+      {company.logoMarcaUrl && <img className="logo-preview" src={assetUrl(company.logoMarcaUrl)} alt={`Logomarca atual de ${company.nome}`} />}
+      {incompleteLogo && <p className="error" role="alert">A API retornou informações incompletas da logomarca. Não é possível alterar a imagem com segurança.</p>}
+      <Field label={hasLogo ? 'Nova imagem para substituição' : 'Logomarca (JPEG, PNG ou WebP; até 5 MB)'}>
+        <input type="file" accept="image/jpeg,image/png,image/webp" disabled={busy || incompleteLogo} onChange={(event) => { const selected = event.target.files?.[0] || null; setFile(selected); setError(selected ? validate(selected) : ''); }} />
+      </Field>
+      {error && <p className="error" role="alert">{error}</p>}
+      <div className="row-end">
+        {hasLogo && <button type="button" className="ghost danger" disabled={busy} onClick={remove}>Remover logomarca</button>}
+        <button type="button" className="ghost" onClick={onClose}>Cancelar</button>
+        <button className="primary" disabled={busy || !file || incompleteLogo}>{busy ? 'Enviando…' : hasLogo ? 'Substituir' : 'Adicionar'}</button>
+      </div>
+    </form>
+  </Modal>;
 }
 
 function EmpresaForm({ cities, onClose, onDone }) {
