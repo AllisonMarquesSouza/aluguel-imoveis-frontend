@@ -1,28 +1,116 @@
-import { useState } from 'react';
-import { api, multipart } from '../api.js';
+import { useCallback, useEffect, useState } from 'react';
+import { api, assetUrl, multipart } from '../api.js';
 import { Field, Modal, useToast } from '../ui.jsx';
 
 const empty = { nome: '', email: '', senha: '', creci: '', telefone: '', whatsapp: '', apresentacao: '' };
 
 export default function Corretores() {
   const [open, setOpen] = useState(false);
+  const [brokers, setBrokers] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [busyId, setBusyId] = useState(null);
+  const [error, setError] = useState('');
   const [toast, show] = useToast();
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const [active, inactive] = await Promise.all([
+        api.get('/corretor/empresa/ativos'),
+        api.get('/corretor/empresa/inativos'),
+      ]);
+      if (!Array.isArray(active) || !Array.isArray(inactive)) {
+        throw new Error('A API retornou as listas de corretores em formato inesperado.');
+      }
+      setBrokers([
+        ...active.map((broker) => ({ ...broker, situacao: 'ATIVO' })),
+        ...inactive.map((broker) => ({ ...broker, situacao: 'INATIVO' })),
+      ]);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  async function created() {
+    setOpen(false);
+    show('Corretor cadastrado.');
+    await load();
+  }
+
+  async function changeStatus(broker) {
+    const active = broker.situacao === 'ATIVO';
+    const action = active ? 'desativar' : 'ativar';
+    const actionLabel = active ? 'Desativar' : 'Ativar';
+    if (!confirm(`${actionLabel} ${broker.nome}?`)) return;
+    setBusyId(broker.id);
+    setError('');
+    try {
+      await api.patch(`/corretor/${action}/${broker.id}`);
+      setBrokers((current) => current?.map((item) => item.id === broker.id
+        ? { ...item, situacao: active ? 'INATIVO' : 'ATIVO' }
+        : item) ?? current);
+      show(`Corretor ${active ? 'desativado' : 'ativado'}.`);
+      await load();
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusyId(null);
+    }
+  }
 
   return (
     <>
       <header className="page-head">
         <div>
           <h1>Equipe de corretores</h1>
-          <p className="muted">Cadastro de corretores da imobiliária.</p>
+          <p className="muted">Corretores vinculados à imobiliária do gestor autenticado.</p>
         </div>
-        <button className="primary" onClick={() => setOpen(true)}>Novo corretor</button>
+        <div className="row-end">
+          <button className="ghost" onClick={load} disabled={loading}>Atualizar</button>
+          <button className="primary" onClick={() => setOpen(true)}>Novo corretor</button>
+        </div>
       </header>
 
       <p className="notice" role="status">
-        A lista e as ações de equipe só serão exibidas quando puderem ser limitadas à sua empresa. Você pode cadastrar novos corretores enquanto isso.
+        As listas de ativos e inativos são limitadas à empresa do gestor autenticado. A situação exibida corresponde à lista retornada pela API.
       </p>
 
-      {open && <NovoCorretor onClose={() => setOpen(false)} onDone={() => { setOpen(false); show('Corretor cadastrado.'); }} />}
+      {error && <div className="request-state"><p className="error" role="alert">{error}</p><button className="ghost" onClick={load}>Tentar novamente</button></div>}
+      {loading && <p className="muted page-message" role="status">Carregando equipe…</p>}
+      {!loading && !error && brokers?.length === 0 && <p className="empty">Nenhum corretor cadastrado nesta empresa.</p>}
+      {brokers?.length > 0 && (
+        <div className="table-wrap">
+          <table className="data-table">
+            <thead><tr><th>Corretor</th><th>CRECI</th><th>Telefone</th><th>WhatsApp</th><th>Situação</th><th>Ações</th></tr></thead>
+            <tbody>
+              {brokers.map((broker) => (
+                <tr key={broker.id}>
+                  <td>
+                    <div className="broker-identity">
+                      {broker.fotoUrl && <img className="broker-photo" src={assetUrl(broker.fotoUrl)} alt="" />}
+                      <span><strong>{broker.nome}</strong><small>{broker.email}</small></span>
+                    </div>
+                  </td>
+                  <td>{broker.creci}</td>
+                  <td>{broker.telefone}</td>
+                  <td>{broker.whatsapp}</td>
+                  <td><span className={`status-pill ${broker.situacao === 'ATIVO' ? 'active' : 'inactive'}`}>{broker.situacao === 'ATIVO' ? 'Ativo' : 'Inativo'}</span></td>
+                  <td><button className={`ghost ${broker.situacao === 'ATIVO' ? 'danger' : ''}`} onClick={() => changeStatus(broker)} disabled={busyId === broker.id}>
+                    {busyId === broker.id ? 'Salvando…' : broker.situacao === 'ATIVO' ? 'Desativar' : 'Ativar'}
+                  </button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {open && <NovoCorretor onClose={() => setOpen(false)} onDone={created} />}
       {toast}
     </>
   );
@@ -42,7 +130,7 @@ function NovoCorretor({ onClose, onDone }) {
     setErr('');
     try {
       await api.form('POST', '/corretor', multipart(f, { foto }));
-      onDone();
+      await onDone();
     } catch (e) {
       setErr(e.message);
       setBusy(false);
@@ -50,7 +138,7 @@ function NovoCorretor({ onClose, onDone }) {
   }
 
   return (
-    <Modal title="Novo corretor" onClose={onClose}>
+    <Modal title="Novo corretor da imobiliária" onClose={onClose}>
       <form onSubmit={submit} className="form two">
         <Field label="Nome"><input value={f.nome} onChange={set('nome')} required maxLength={150} /></Field>
         <Field label="CRECI"><input value={f.creci} onChange={set('creci')} required maxLength={30} /></Field>

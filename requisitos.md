@@ -389,7 +389,8 @@ O inventário abaixo evita transformar requisitos de negócio em endpoints presu
 - **Sessão:** `JWTService` emite `sub` (e-mail), emissor e expiração de duas horas, sem claim de perfil. No checkout local consultado, `TokenDto` e `POST /auth/login` retornam `token` e `perfil`; o serviço preenche o perfil com `usuario.getPerfil()`. O front-end usa o campo para navegação, enquanto a API revalida permissões no backend.
 - **Usuários:** `POST /auth/register` exige administrador. Não foi identificada API de listagem/consulta, edição ou alteração de status, nem gestão de usuários da própria empresa pelo gestor.
 - **Empresas:** os endpoints necessários às operações de empresa previstas em RF-03 estão documentados para administrador.
-- **Corretores:** consulta pública de corretores ativos; cadastro e ativação/desativação pelo gestor da própria empresa. Não foi identificado endpoint de edição nem endpoint documentado para listar a equipe privada de uma empresa.
+- **Corretores:** `GET /corretor/empresa/ativos` e `GET /corretor/empresa/inativos` listam os registros da empresa do gestor autenticado por situação; cadastro e ativação/desativação também são limitados à empresa do gestor. Não foi identificado endpoint de edição dos dados profissionais do corretor.
+- **Tipos de cadastro de corretor:** `POST /empresa/autonoma` cadastra uma empresa autônoma junto com o corretor proprietário; `POST /corretor` cadastra um corretor vinculado à imobiliária do gestor. `POST /auth/register` aceita o perfil `CORRETOR`, mas cria somente um usuário, sem o registro profissional necessário às operações do acervo.
 - **Proprietários:** busca por nome/documento e cadastro para corretor ativo da empresa. Não foi identificada atualização.
 - **Cidades e características:** existem consultas; há operações administrativas documentadas para criar/remover cidades e criar características.
 - **Prédios e imóveis:** existem cadastro e consulta de prédios e imóveis, incluindo dados específicos de casa, terreno, apartamento e lote. A gestão de imóvel cobre publicação, situação e documentos; o controlador de imóvel não expõe edição do cadastro comum.
@@ -417,25 +418,23 @@ Esta lista separa o que já existe no painel do que ainda falta fazer. O andamen
 
 ### Prioridade 1 — Administração e operação disponíveis
 
-#### T-03 — Empresas e cadastros auxiliares — **Parcial**
+#### T-03 — Empresas e cadastros auxiliares — **Concluída no front-end**
 
-- **Já feito:** administrador consulta, cria e edita empresas, altera sua situação e gerencia logomarcas; também consulta e mantém cidades e características nas operações disponíveis.
-- **Falta no front:** adicionar a ação para remover empresa por `DELETE /empresa/{id}`, com confirmação explícita e apresentação dos erros retornados pelo servidor.
-- **Resultado esperado:** somente o administrador acessa essas telas; a lista reflete o resultado confirmado pela API.
+- **Já feito:** administrador consulta, cria, edita, ativa, desativa e remove empresas; também gerencia logomarcas e os cadastros auxiliares disponíveis.
+- **Resultado esperado:** somente o administrador acessa essas operações; remoções dependem da confirmação da pessoa e do resultado da API.
 
-#### T-04 — Equipe de corretores — **Parcial; aguardando uma lista segura**
+#### T-04 — Equipe de corretores — **Parcial; edição depende da API**
 
-- **Já feito:** gestor cadastra corretores com os dados e a foto exigidos pela API.
-- **Falta no front:** listar a equipe da empresa e permitir ativar/desativar os corretores exibidos.
-- **Bloqueio:** a listagem disponível é pública e global. A tela de gestão precisa de uma origem limitada à empresa do gestor; não deve usar a lista pública para escolher quem alterar.
-- **Resultado esperado:** o gestor só vê e altera corretores da própria empresa, e a situação exibida corresponde à resposta da API.
+- **Já feito:** gestor cadastra, consulta e ativa/desativa corretores da própria empresa. As listas usam `GET /corretor/empresa/ativos` e `GET /corretor/empresa/inativos`.
+- **Bloqueio:** a RF-05 também prevê editar os dados profissionais do corretor, mas a API não oferece operação de atualização. Não reutilizar o cadastro nem alterar dados localmente para contornar essa ausência.
+- **Resultado esperado:** somente corretores da empresa do gestor aparecem; as mudanças de situação usam IDs das listas autorizadas e refletem respostas da API.
 
-#### T-05 — Cadastro e administração de usuários — **Parcial; há um ajuste de front pendente**
+#### T-05 — Cadastro e administração de usuários — **Parcial; cadastros de corretor separados**
 
-- **Já feito:** administrador cria contas por `POST /auth/register` e escolhe a empresa quando o perfil exige vínculo empresarial.
-- **Falta no front agora:** remover `CORRETOR` das opções do formulário genérico. Esse endpoint cria a conta, mas não o cadastro profissional de corretor; o cadastro completo continua no fluxo próprio do gestor.
-- **Falta depois:** criar consulta, edição e alteração de situação de usuários quando essas operações estiverem disponíveis para o painel. A gestão pelo gestor só entra no front dentro do escopo autorizado.
-- **Resultado esperado:** o formulário não cria contas de corretor incompletas; perfil, situação e vínculo são apresentados conforme a API.
+- **Já feito:** administrador cria contas gerais pelos perfis compatíveis com `POST /auth/register`. O formulário não oferece `CORRETOR`, pois essa rota cria somente um usuário, sem o registro profissional.
+- **Já feito em fluxos próprios:** administrador cadastra o corretor autônomo junto com a empresa em Empresas; gestor cadastra corretores vinculados à imobiliária em Corretores. São operações distintas e permanecem disponíveis.
+- **Falta depois:** consulta, edição e alteração de situação de usuários quando a API oferecer essas operações. A gestão pelo gestor só deve ser incluída dentro do escopo autorizado.
+- **Resultado esperado:** contas gerais e cadastros profissionais são apresentados em fluxos separados, de acordo com seus contratos e permissões.
 
 #### T-06 — Consulta e cadastro de proprietários — **Parcial; edição depende de operação disponível**
 

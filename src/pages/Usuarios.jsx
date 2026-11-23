@@ -5,7 +5,6 @@ import { Field, useToast } from '../ui.jsx';
 const PERFIS = [
   ['ADMINISTRADOR', 'Administrador'],
   ['GESTOR', 'Gestor'],
-  ['CORRETOR', 'Corretor'],
   ['CLIENTE', 'Cliente'],
 ];
 const empty = { nome: '', email: '', senha: '', perfil: 'GESTOR', empresaId: '' };
@@ -49,7 +48,7 @@ export default function Usuarios() {
       <header className="page-head">
         <div>
           <h1>Usuários</h1>
-          <p className="muted">Crie contas de acesso ao painel e ao app.</p>
+          <p className="muted">Crie contas gerais de acesso ao painel e ao app.</p>
         </div>
       </header>
 
@@ -89,7 +88,7 @@ export default function Usuarios() {
             ))}
           </ul>
           <p className="muted note">
-            Corretores que aparecem na vitrine (com foto, CRECI e contato) são cadastrados pelo gestor, em Corretores.
+            Os cadastros profissionais de corretor usam fluxos próprios: o administrador cadastra o corretor autônomo como empresa em Empresas; o gestor cadastra corretores vinculados à imobiliária em Corretores. Este formulário não cria esses registros profissionais.
           </p>
         </aside>
       </div>
