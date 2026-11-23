@@ -21,6 +21,9 @@ Defina `VITE_API_URL` com a URL pública da API e **libere CORS** nela para o do
 - Cadastros auxiliares: cidades e características (administrador)
 - Corretores: cadastro com foto para gestor; lista de equipe e ações de status aguardam uma listagem privada por empresa na API
 - Proprietários: busca por nome/documento e cadastro para corretor
+- Acervo para corretor: consulta/detalhe de imóveis, cadastro por natureza, prédios e gestão das fotos autorizadas pela API
+- Loteamentos para corretor: consulta hierárquica, cadastro de loteamentos/quadras e acesso ao cadastro de lotes pelo acervo
+- Logomarcas de empresas: inclusão, substituição e remoção por administrador
 - Usuários: `POST /auth/register` (administrador); lista, edição e status não estão disponíveis no contrato atual da API
 
 ## Pontos a conferir
@@ -28,4 +31,6 @@ Defina `VITE_API_URL` com a URL pública da API e **libere CORS** nela para o do
 - Depois de atualizar a API, encerre uma sessão iniciada antes dessa mudança e entre novamente para receber o campo `perfil`.
 - O `GET /corretor` da API é público e retorna perfis ativos sem limitar a empresa; o painel não o usa como lista de gestão da equipe.
 - A API não documenta endpoints de contatos, atendimento, contratos, parcelas, pagamentos ou relatórios.
-- A configuração base da API indica limite de 5 MB por arquivo e 50 MB por requisição, mas há um trecho antigo do README da API que ainda menciona 1 MB. Confirme configuração de implantação antes de validar uploads no cliente.
+- Os validadores atuais da API aceitam imagens JPEG, PNG e WebP de até 5 MB; documentos aceitam PDF, JPEG, PNG e WebP de até 5 MB. A configuração de implantação precisa permitir esses limites.
+- As ações de publicação/situação e documentos são do gestor, mas os endpoints `GET /imovel` e `GET /imovel/{id}` exigem corretor. As telas aguardam uma consulta de imóveis com escopo de gestor antes de expor essas ações.
+- O endpoint `GET /cidade` retorna o catálogo geral. O servidor valida se a cidade pertence à área de atuação da empresa; a API ainda não fornece uma lista de cidades autorizadas para popular o seletor.
