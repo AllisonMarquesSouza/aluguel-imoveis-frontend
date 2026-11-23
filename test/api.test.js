@@ -8,7 +8,7 @@ globalThis.localStorage = {
   removeItem: (key) => storage.delete(key),
 };
 
-const { api, getStoredProfile, setToken, setUnauthorizedHandler } = await import('../src/api.js');
+const { api, getStoredProfile, multipart, setToken, setUnauthorizedHandler } = await import('../src/api.js');
 const originalFetch = globalThis.fetch;
 
 test('protected 401 notifies the session handler and rejects the request', async () => {
@@ -66,6 +66,15 @@ test('stores the returned profile with the token and clears both on logout', () 
   setToken(null);
   assert.equal(getStoredProfile(), null);
   assert.equal(storage.has('mi_perfil'), false);
+});
+
+test('multipart repeats array file parts for endpoints that accept multiple files', () => {
+  const first = new Blob(['first'], { type: 'image/jpeg' });
+  const second = new Blob(['second'], { type: 'image/png' });
+  const form = multipart({ titulo: 'Imóvel' }, { fotos: [first, second] });
+  assert.equal(form.getAll('fotos').length, 2);
+  assert.equal(form.getAll('fotos')[0].size, first.size);
+  assert.equal(form.getAll('fotos')[1].size, second.size);
 });
 
 test.after(() => {
