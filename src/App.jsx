@@ -8,6 +8,8 @@ import Usuarios from './pages/Usuarios.jsx';
 import Empresas from './pages/Empresas.jsx';
 import CadastrosAuxiliares from './pages/CadastrosAuxiliares.jsx';
 import Proprietarios from './pages/Proprietarios.jsx';
+import Imoveis from './pages/Imoveis.jsx';
+import Loteamentos from './pages/Loteamentos.jsx';
 
 function Shell() {
   const { session, logout } = useAuth();
@@ -20,6 +22,8 @@ function Shell() {
           <NavLink to="/" end>Visão geral</NavLink>
           {can(session, 'GESTOR') && <NavLink to="/corretores">Corretores</NavLink>}
           {can(session, 'CORRETOR') && <NavLink to="/proprietarios">Proprietários</NavLink>}
+          {can(session, 'CORRETOR') && <NavLink to="/imoveis">Imóveis</NavLink>}
+          {can(session, 'CORRETOR') && <NavLink to="/loteamentos">Loteamentos</NavLink>}
           {can(session, 'ADMINISTRADOR') && <NavLink to="/empresas">Empresas</NavLink>}
           {can(session, 'ADMINISTRADOR') && <NavLink to="/cadastros">Cadastros</NavLink>}
           {can(session, 'ADMINISTRADOR') && <NavLink to="/usuarios">Usuários</NavLink>}
@@ -67,6 +71,8 @@ export default function App() {
         <Route index element={<Dashboard />} />
         <Route path="corretores" element={can(session, 'GESTOR') ? <Corretores /> : <Navigate to="/" replace />} />
         <Route path="proprietarios" element={can(session, 'CORRETOR') ? <Proprietarios /> : <Navigate to="/" replace />} />
+        <Route path="imoveis" element={can(session, 'CORRETOR') ? <Imoveis /> : <Navigate to="/" replace />} />
+        <Route path="loteamentos" element={can(session, 'CORRETOR') ? <Loteamentos /> : <Navigate to="/" replace />} />
         <Route path="empresas" element={can(session, 'ADMINISTRADOR') ? <Empresas /> : <Navigate to="/" replace />} />
         <Route path="cadastros" element={can(session, 'ADMINISTRADOR') ? <CadastrosAuxiliares /> : <Navigate to="/" replace />} />
         <Route path="usuarios" element={can(session, 'ADMINISTRADOR') ? <Usuarios /> : <Navigate to="/" replace />} />

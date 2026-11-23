@@ -84,10 +84,20 @@ export default function Dashboard() {
           </Link>
         )}
         {can(session, 'CORRETOR') && (
-          <Link to="/proprietarios" className="action">
-            <h3>Proprietários</h3>
-            <p>Pesquise e cadastre proprietários da sua empresa.</p>
-          </Link>
+          <>
+            <Link to="/proprietarios" className="action">
+              <h3>Proprietários</h3>
+              <p>Pesquise e cadastre proprietários da sua empresa.</p>
+            </Link>
+            <Link to="/imoveis" className="action">
+              <h3>Acervo de imóveis</h3>
+              <p>Consulte imóveis e prédios, cadastre imóveis e gerencie suas fotos.</p>
+            </Link>
+            <Link to="/loteamentos" className="action">
+              <h3>Loteamentos</h3>
+              <p>Organize loteamentos, quadras e lotes.</p>
+            </Link>
+          </>
         )}
         {can(session, 'ADMINISTRADOR') && (
           <>

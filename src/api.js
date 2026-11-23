@@ -45,7 +45,7 @@ const FALLBACK = {
   403: 'Você não tem permissão para esta ação.',
   404: 'Não encontrado.',
   409: 'Conflito: o registro já existe ou o estado atual não permite a ação.',
-  413: 'Arquivo grande demais (o limite atual da API é 1 MB por arquivo).',
+  413: 'Arquivo grande demais (a API limita cada arquivo a 5 MB).',
   415: 'Tipo de conteúdo não suportado.',
 };
 
@@ -91,6 +91,8 @@ export const api = {
 export function multipart(dto, files = {}) {
   const f = new FormData();
   f.append('dto', new Blob([JSON.stringify(dto)], { type: 'application/json' }));
-  Object.entries(files).forEach(([name, file]) => f.append(name, file));
+  Object.entries(files).forEach(([name, value]) => {
+    (Array.isArray(value) ? value : [value]).forEach((file) => f.append(name, file));
+  });
   return f;
 }
