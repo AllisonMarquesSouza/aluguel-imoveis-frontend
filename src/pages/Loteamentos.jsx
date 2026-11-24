@@ -34,7 +34,7 @@ export default function Loteamentos() {
     setError('');
     const [developmentResult, propertyResult, cityResult] = await Promise.allSettled([
       api.get('/loteamento'), isManager ? Promise.resolve([]) : api.get('/imovel'),
-      isManager ? Promise.resolve([]) : api.get('/cidade'),
+      isManager ? Promise.resolve([]) : api.get('/cidade/empresa'),
     ]);
     const failures = [];
     if (developmentResult.status === 'fulfilled' && Array.isArray(developmentResult.value)) setDevelopments(developmentResult.value);

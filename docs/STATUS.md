@@ -33,7 +33,7 @@ A troca de senha usa a operação autenticada da própria conta. A interface val
 
 - O formulário geral não cria perfil `CORRETOR`: o cadastro do corretor autônomo permanece junto da empresa autônoma, e o corretor vinculado à imobiliária é criado em Corretores.
 - A API limita o gestor a usuários, corretores, imóveis, loteamentos, lotes, documentos e logomarca da empresa vinculada à sessão. O front não aceita um identificador arbitrário de empresa para esses fluxos.
-- Durante a edição de imóvel, o responsável profissional, o proprietário e, para gestores, prédio e cidade existentes são mantidos quando a API não fornece um catálogo de opções autorizado para alterá-los. O restante do DTO segue `ImovelUpdateDto`.
+- Formulários de imóveis e loteamentos carregam as cidades da empresa pela sessão com `GET /cidade/empresa`; o catálogo geral `GET /cidade` permanece nas telas que precisam consultar dados globais.
 - Os documentos têm um por tipo (`MATRICULA`, `CARNE_IPTU`, `AUTORIZACAO_PROPRIETARIO`) e aceitam PDF/JPEG/PNG/WebP até 5 MB. A interface não oferece remoção porque não há endpoint correspondente.
 - A caixa de contatos mostra o retorno e canal vindos da API. O gestor consulta a empresa; só o corretor responsável pode alterar o retorno.
 - A troca de senha envia senha atual, nova senha e confirmação. A tela aplica 12–255 caracteres e o limite de 72 bytes UTF-8 documentado pela API.
@@ -48,7 +48,6 @@ A troca de senha usa a operação autenticada da própria conta. A interface val
 
 ## Pendências conhecidas
 
-1. A API oferece `GET /cidade` como catálogo geral, sem filtrar cidades pela área de atuação da empresa. O backend valida a cidade ao salvar; o formulário de criação de imóvel para corretor pode mostrar opções que a API recusará. É necessário um catálogo de cidades autorizado por empresa para eliminar essa tentativa inválida.
-2. Confirmar na implantação os limites de upload: até 5 MB por arquivo e até 50 MB por requisição, conforme documentação atual da API.
-3. Aguardar a camada de contratos para iniciar T-11. Parcelas/pagamentos (T-12) e relatórios (T-13) também seguem sem contratos disponíveis.
-4. Completar revisão manual de navegação por teclado/leitor de tela e testes de interação visual em navegador para T-14.
+1. Confirmar na implantação os limites de upload: até 5 MB por arquivo e até 50 MB por requisição, conforme documentação atual da API.
+2. Aguardar a camada de contratos para iniciar T-11. Parcelas/pagamentos (T-12) e relatórios (T-13) também seguem sem contratos disponíveis.
+3. Completar revisão manual de navegação por teclado/leitor de tela e testes de interação visual em navegador para T-14.

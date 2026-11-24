@@ -36,5 +36,5 @@ Defina `VITE_API_URL` com a URL pública da API e **libere CORS** nela para o do
 - `GET /corretor/empresa/ativos` e `GET /corretor/empresa/inativos` retornam listas limitadas à empresa do gestor autenticado; o painel usa essas rotas para oferecer ativação e desativação.
 - O `POST /auth/register` aceita `CORRETOR`, mas cria apenas um usuário. O formulário geral não oferece esse perfil: corretor autônomo é criado com a empresa por `POST /empresa/autonoma`, e corretor de imobiliária pelo gestor em `POST /corretor`.
 - Os validadores atuais da API aceitam imagens JPEG, PNG e WebP de até 5 MB; documentos aceitam PDF, JPEG, PNG e WebP de até 5 MB. A configuração de implantação precisa permitir esses limites.
-- O endpoint `GET /cidade` retorna o catálogo geral. O servidor valida se a cidade pertence à área de atuação da empresa; a API ainda não fornece uma lista de cidades autorizadas para popular os formulários de cadastro.
+- `GET /cidade` continua sendo o catálogo geral, usado nas telas administrativas. Os formulários de imóveis e loteamentos usam `GET /cidade/empresa`, que retorna as cidades da empresa do usuário autenticado para gestores e corretores.
 - A camada de contratos permanece fora desta implementação. A API consultada também não oferece endpoints de parcelas/pagamentos ou relatórios.

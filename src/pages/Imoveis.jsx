@@ -98,7 +98,7 @@ export default function Imoveis() {
     setLoading(true);
     setError('');
     const results = await Promise.allSettled([
-      api.get('/imovel'), isManager ? Promise.resolve([]) : api.get('/predio'), api.get('/cidade'),
+      api.get('/imovel'), isManager ? Promise.resolve([]) : api.get('/predio'), api.get('/cidade/empresa'),
       api.get('/caracteristica'), api.get('/loteamento'),
     ]);
     const failures = [];
@@ -263,15 +263,9 @@ function NewPropertyForm({ property = null, isManager = false, cities, features,
     ...quadra, development, label: `${development.nome} · ${quadra.identificacao}`,
   })));
   const selectedQuadra = quadraOptions.find((item) => String(item.id) === String(form.quadraId));
-  const currentAddress = property?.endereco;
-  const selectedCity = currentAddress?.cidadeId
-    ? cities.find((city) => Number(city.id) === Number(currentAddress.cidadeId))
-      || { id: currentAddress.cidadeId, nome: currentAddress.cidade || String(currentAddress.cidadeId), uf: currentAddress.uf || '' }
-    : null;
-  const editCities = property && selectedCity ? [selectedCity] : cities;
   const addressCities = nature === 'LOTE' && selectedQuadra
     ? cities.filter((city) => Number(city.id) === Number(selectedQuadra.development.cidadeId))
-    : editCities;
+    : cities;
 
   useEffect(() => {
     if (nature === 'LOTE' && selectedQuadra) {
