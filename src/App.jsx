@@ -43,7 +43,12 @@ function Shell() {
             <strong>{nome}</strong>
             <small>{session.perfil ?? 'Sessão ativa'}</small>
           </div>
-          <div className="me-actions"><button className="ghost" onClick={() => { setMessage(''); setChangingPassword(true); }}>Alterar senha</button><button className="ghost" onClick={logout}>Sair</button></div>
+          <div className="me-actions">
+            <button type="button" className="account-action change-password" aria-label="Alterar senha" onClick={() => { setMessage(''); setChangingPassword(true); }}>
+              <span className="account-action-full">Alterar senha</span><span className="account-action-compact" aria-hidden="true">Senha</span>
+            </button>
+            <button type="button" className="account-action logout-action" onClick={() => logout()}>Sair</button>
+          </div>
         </div>
       </aside>
       <main className="main"><Outlet /></main>

@@ -117,18 +117,29 @@
 .me strong { display: block; overflow: hidden; color: #fff; font-size: 0.9rem; text-overflow: ellipsis; white-space: nowrap; }
 .me small { color: #a9c2c9; font-size: 0.78rem; }
 
-.me .ghost {
-  grid-column: 1 / -1;
-  width: 100%;
-  margin-top: 0.55rem;
-  border-color: rgb(210 234 237 / 20%);
-  background: rgb(255 255 255 / 3%);
+.me-actions { grid-column: 1 / -1; display: flex; align-items: center; gap: 0.4rem; margin-top: 0.35rem; }
+.account-action {
+  display: inline-flex;
+  min-width: 0;
+  min-height: 34px;
+  align-items: center;
+  justify-content: center;
+  padding: 0.35rem 0.6rem;
+  border: 1px solid rgb(210 234 237 / 20%);
+  border-radius: 8px;
+  background: rgb(255 255 255 / 4%);
   color: #d5e6e8;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 650;
+  line-height: 1.2;
+  cursor: pointer;
+  transition: border-color 150ms ease, background-color 150ms ease, color 150ms ease;
 }
-
-.me .ghost:hover { border-color: rgb(210 234 237 / 35%); background: rgb(255 255 255 / 8%); }
-.me-actions { grid-column: 1 / -1; display: flex; gap: 0.5rem; }
-.me-actions .ghost { flex: 1; width: auto; min-height: 40px; margin-top: 0; }
+.account-action:hover { border-color: rgb(210 234 237 / 38%); background: rgb(255 255 255 / 9%); color: #fff; }
+.change-password { flex: 1; }
+.logout-action { flex: 0 0 auto; color: #b7cbd0; background: transparent; }
+.account-action-compact { display: none; }
 
 .main {
   width: 100%;
@@ -183,9 +194,8 @@
   .side nav { grid-column: 1 / -1; grid-row: 2; display: flex; min-width: 0; gap: 0.35rem; overflow-x: auto; scrollbar-width: thin; }
   .side nav a { min-height: 42px; flex: 0 0 auto; padding: 0.55rem 0.75rem; white-space: nowrap; }
   .side nav a.active::before { top: auto; right: 12px; bottom: 0; left: 12px; width: auto; height: 2px; }
-  .me { grid-column: 2; grid-row: 1; grid-template-columns: auto minmax(0, 1fr) auto; gap: 0.6rem; padding: 0; border: 0; }
-  .me .ghost { grid-column: auto; width: auto; min-height: 40px; margin: 0; }
-  .me-actions { grid-column: auto; }
+  .me { grid-column: 2; grid-row: 1; width: min(100%, 340px); grid-template-columns: auto minmax(0, 1fr); gap: 0.6rem; padding: 0; border: 0; }
+  .me-actions { grid-column: 1 / -1; }
   .main { grid-column: 1; padding-top: clamp(1.8rem, 5vw, 3rem); }
 }
 
@@ -193,12 +203,14 @@
   .side { gap: 0.6rem 0.75rem; padding: 0.75rem 1rem 0.55rem; }
   .brand { gap: 0.55rem; font-size: 1.1rem; }
   .brand i { width: 27px; height: 27px; }
-  .me { grid-template-columns: auto auto; }
-  .me > div { display: none; }
-  .me > .me-actions { display: flex; }
-  .me-actions { grid-column: 1 / -1; }
-  .me .avatar { width: 36px; height: 36px; }
-  .me .ghost { min-height: 38px; padding: 0.5rem 0.7rem; }
+  .me { grid-template-columns: auto auto; gap: 0.35rem; }
+  .me > div:not(.me-actions) { display: none; }
+  .me > .me-actions { display: flex; grid-column: 2; grid-row: 1; justify-content: flex-end; gap: 0.25rem; margin: 0; }
+  .me .avatar { width: 32px; height: 32px; }
+  .account-action { min-height: 32px; padding: 0.3rem 0.45rem; font-size: 0.74rem; }
+  .change-password { flex: 0 1 auto; }
+  .account-action-full { display: none; }
+  .account-action-compact { display: inline; }
   .side nav { margin: 0 -0.2rem; }
   .main { padding: 1.7rem 1rem 2.5rem; }
   .page-head { align-items: stretch; flex-direction: column; gap: 1rem; margin-bottom: 1.45rem; }
