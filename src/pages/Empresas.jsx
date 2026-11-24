@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api, assetUrl, multipart } from '../api.js';
 import { Field, Modal, useToast } from '../ui.jsx';
+import CityMultiSelect from '../CityMultiSelect.jsx';
 
 const EMPTY_EMPRESA = {
   nome: '',
@@ -324,14 +325,14 @@ function EmpresaForm({ cities, onClose, onDone }) {
             {cities.map((city) => <option key={city.id} value={city.id}>{city.nome} · {city.uf}</option>)}
           </select>
         </Field>
-        <Field label="Cidades de atuação" hint={cities.length ? 'Selecione uma ou mais cidades.' : 'Cadastre cidades em Cadastros auxiliares antes de criar a empresa.'}>
-          <select multiple size={3} value={empresa.cidadesAtuacaoIds} onChange={(event) => setEmpresa((current) => ({
-            ...current,
-            cidadesAtuacaoIds: Array.from(event.target.selectedOptions, (option) => option.value),
-          }))} required>
-            {cities.map((city) => <option key={city.id} value={city.id}>{city.nome} · {city.uf}</option>)}
-          </select>
-        </Field>
+        <CityMultiSelect
+          label="Cidades de atuação"
+          hint={cities.length ? 'Busque pelo nome ou UF e marque uma ou mais cidades. Para remover, desmarque ou use “Limpar seleção”.' : 'Cadastre cidades em Cadastros auxiliares antes de criar a empresa.'}
+          emptyMessage="Nenhuma cidade cadastrada. Cadastre uma cidade em Cadastros auxiliares antes de continuar."
+          cities={cities}
+          value={empresa.cidadesAtuacaoIds}
+          onChange={(cidadesAtuacaoIds) => setEmpresa((current) => ({ ...current, cidadesAtuacaoIds }))}
+        />
         <Field label="CEP"><input value={empresa.cep} onChange={updateEmpresa('cep')} maxLength={8} /></Field>
         <Field label="Logradouro"><input value={empresa.logradouro} onChange={updateEmpresa('logradouro')} maxLength={180} /></Field>
         <Field label="Número"><input value={empresa.numero} onChange={updateEmpresa('numero')} maxLength={20} /></Field>
@@ -431,7 +432,7 @@ function EditarEmpresa({ company, cities, onClose, onDone }) {
   return (
     <Modal title={`Editar ${company.nome}`} onClose={onClose}>
       <form className="form two" onSubmit={submit}>
-        <p className="muted span2">Campos opcionais vazios são ignorados pela API. A lista de cidades de atuação pode ser limpa.</p>
+        <p className="muted span2">Campos opcionais vazios são ignorados pela API.</p>
         <Field label="Nome"><input value={form.nome} onChange={update('nome')} maxLength={150} /></Field>
         <Field label="Razão social"><input value={form.razaoSocial} onChange={update('razaoSocial')} maxLength={180} /></Field>
         <Field label="Tipo de documento"><select value={form.tipoDocumento} onChange={update('tipoDocumento')}><option value="CNPJ">CNPJ</option><option value="CPF">CPF</option></select></Field>
@@ -446,14 +447,14 @@ function EditarEmpresa({ company, cities, onClose, onDone }) {
             {cities.map((city) => <option key={city.id} value={city.id}>{city.nome} · {city.uf}</option>)}
           </select>
         </Field>
-        <Field label="Cidades de atuação">
-          <select multiple size={3} value={form.cidadesAtuacaoIds} onChange={(event) => setForm((current) => ({
-            ...current,
-            cidadesAtuacaoIds: Array.from(event.target.selectedOptions, (option) => option.value),
-          }))}>
-            {cities.map((city) => <option key={city.id} value={city.id}>{city.nome} · {city.uf}</option>)}
-          </select>
-        </Field>
+        <CityMultiSelect
+          label="Cidades de atuação"
+          hint="Busque pelo nome ou UF e marque as cidades que a empresa atende. Remova opções desmarcando-as ou usando “Limpar seleção”."
+          emptyMessage="Não foi possível carregar cidades. Tente novamente antes de alterar a área de atuação."
+          cities={cities}
+          value={form.cidadesAtuacaoIds}
+          onChange={(cidadesAtuacaoIds) => setForm((current) => ({ ...current, cidadesAtuacaoIds }))}
+        />
         <Field label="CEP"><input value={form.cep} onChange={update('cep')} maxLength={8} /></Field>
         <Field label="Logradouro"><input value={form.logradouro} onChange={update('logradouro')} maxLength={180} /></Field>
         <Field label="Número"><input value={form.numero} onChange={update('numero')} maxLength={20} /></Field>
