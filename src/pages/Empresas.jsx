@@ -133,9 +133,9 @@ export default function Empresas() {
 
       {error && <p className="error page-message" role="alert">{error}</p>}
       {loading && <p className="muted page-message" role="status">Carregando empresas…</p>}
-      {!loading && companies?.length === 0 && <p className="empty">Nenhuma empresa cadastrada.</p>}
+      {!loading && companies?.length === 0 && <p className="empty" role="status">Nenhuma empresa cadastrada.</p>}
       {companies?.length > 0 && (
-        <div className="table-wrap">
+        <div className="table-wrap" role="region" aria-label="Empresas cadastradas" tabIndex={0}>
           <table className="data-table">
             <thead><tr><th>Empresa</th><th>Logomarca</th><th>Tipo</th><th>Documento</th><th>Cidades</th><th>Situação</th><th>Ações</th></tr></thead>
             <tbody>

@@ -95,9 +95,9 @@ export default function CadastrosAuxiliares() {
             <Field label="UF"><input value={cityForm.uf} onChange={(event) => setCityForm({ ...cityForm, uf: event.target.value })} maxLength={2} minLength={2} required /></Field>
             <button className="primary" disabled={busy}>Adicionar cidade</button>
           </form>
-          {cities?.length === 0 && <p className="empty">Nenhuma cidade cadastrada.</p>}
+          {cities?.length === 0 && <p className="empty" role="status">Nenhuma cidade cadastrada.</p>}
           {cities?.length > 0 && (
-            <div className="table-wrap">
+            <div className="table-wrap" role="region" aria-label="Cidades cadastradas" tabIndex={0}>
               <table className="data-table">
                 <thead><tr><th>Cidade</th><th>UF</th><th>Ação</th></tr></thead>
                 <tbody>
@@ -119,7 +119,7 @@ export default function CadastrosAuxiliares() {
             <Field label="Nome"><input value={featureName} onChange={(event) => setFeatureName(event.target.value)} maxLength={50} required /></Field>
             <button className="primary" disabled={busy}>Adicionar característica</button>
           </form>
-          {features?.length === 0 && <p className="empty">Nenhuma característica cadastrada.</p>}
+          {features?.length === 0 && <p className="empty" role="status">Nenhuma característica cadastrada.</p>}
           {features?.length > 0 && (
             <ul className="catalog-list">
               {features.map((feature) => <li key={feature.id}>{feature.nome}</li>)}

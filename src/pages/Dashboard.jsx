@@ -52,12 +52,12 @@ export default function Dashboard() {
       </header>
 
       {loading && (
-        <div className="stats" aria-label="Carregando indicadores">
+        <div className="stats" role="status" aria-label="Carregando indicadores">
           {sources.map((source) => <div className="stat skeleton" key={source.path} />)}
         </div>
       )}
       {!loading && metrics.length > 0 && (
-        <div className="stats">
+        <div className="stats" role="status" aria-live="polite">
           {metrics.filter((item) => item.value !== null).map((item) => (
             <div className="stat" key={item.path}>
               <strong>{item.value}</strong>
@@ -73,7 +73,7 @@ export default function Dashboard() {
         </div>
       )}
       {!loading && !error && sources.length === 0 && can(session, 'GESTOR') && (
-        <p className="muted request-state">Os indicadores da equipe ainda não estão disponíveis.</p>
+        <p className="muted request-state" role="status">Os indicadores da equipe ainda não estão disponíveis.</p>
       )}
 
       <div className="actions">
