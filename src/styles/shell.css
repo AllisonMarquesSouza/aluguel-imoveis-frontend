@@ -127,6 +127,8 @@
 }
 
 .me .ghost:hover { border-color: rgb(210 234 237 / 35%); background: rgb(255 255 255 / 8%); }
+.me-actions { grid-column: 1 / -1; display: flex; gap: 0.5rem; }
+.me-actions .ghost { flex: 1; width: auto; min-height: 40px; margin-top: 0; }
 
 .main {
   width: 100%;
@@ -183,6 +185,7 @@
   .side nav a.active::before { top: auto; right: 12px; bottom: 0; left: 12px; width: auto; height: 2px; }
   .me { grid-column: 2; grid-row: 1; grid-template-columns: auto minmax(0, 1fr) auto; gap: 0.6rem; padding: 0; border: 0; }
   .me .ghost { grid-column: auto; width: auto; min-height: 40px; margin: 0; }
+  .me-actions { grid-column: auto; }
   .main { grid-column: 1; padding-top: clamp(1.8rem, 5vw, 3rem); }
 }
 
@@ -192,6 +195,8 @@
   .brand i { width: 27px; height: 27px; }
   .me { grid-template-columns: auto auto; }
   .me > div { display: none; }
+  .me > .me-actions { display: flex; }
+  .me-actions { grid-column: 1 / -1; }
   .me .avatar { width: 36px; height: 36px; }
   .me .ghost { min-height: 38px; padding: 0.5rem 0.7rem; }
   .side nav { margin: 0 -0.2rem; }

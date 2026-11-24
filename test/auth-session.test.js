@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { can, readSession } from '../src/auth-session.js';
+import { can, canAccessPanel, readSession } from '../src/auth-session.js';
 import { dashboardSourcesFor } from '../src/dashboard-metrics.js';
 
 function tokenFor(payload) {
@@ -20,6 +20,15 @@ test('does not authorize an unknown or missing profile', () => {
   assert.equal(session.perfil, null);
   assert.equal(can(session, 'ADMINISTRADOR'), false);
   assert.equal(can(null, 'ADMINISTRADOR'), false);
+});
+
+test('panel access allows only administrator, manager, and broker sessions', () => {
+  assert.equal(canAccessPanel({ perfil: 'ADMINISTRADOR' }), true);
+  assert.equal(canAccessPanel({ perfil: 'GESTOR' }), true);
+  assert.equal(canAccessPanel({ perfil: 'CORRETOR' }), true);
+  assert.equal(canAccessPanel({ perfil: 'CLIENTE' }), false);
+  assert.equal(canAccessPanel({ perfil: 'DESCONHECIDO' }), false);
+  assert.equal(canAccessPanel(null), false);
 });
 
 test('uses the profile returned by login when it is not in the JWT', () => {

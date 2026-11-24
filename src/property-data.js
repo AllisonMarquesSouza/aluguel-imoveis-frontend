@@ -76,7 +76,7 @@ function lotDto(form) {
   };
 }
 
-export function buildPropertyDto(form, nature, featureIds, photoCoverOrder) {
+function buildPropertyFields(form, nature, featureIds) {
   const dto = {
     codigo: form.codigo.trim(),
     titulo: form.titulo.trim(),
@@ -89,7 +89,6 @@ export function buildPropertyDto(form, nature, featureIds, photoCoverOrder) {
     descricao: optionalText(form.descricao),
     natureza: nature,
     caracteristicasIds: featureIds.map(Number),
-    fotoCapaOrdem: photoCoverOrder,
   };
 
   if (nature === 'CASA') {
@@ -106,4 +105,12 @@ export function buildPropertyDto(form, nature, featureIds, photoCoverOrder) {
   }
 
   return dto;
+}
+
+export function buildPropertyDto(form, nature, featureIds, photoCoverOrder) {
+  return { ...buildPropertyFields(form, nature, featureIds), fotoCapaOrdem: photoCoverOrder };
+}
+
+export function buildPropertyUpdateDto(form, nature, featureIds, corretorId) {
+  return { ...buildPropertyFields(form, nature, featureIds), corretorId: Number(corretorId) };
 }

@@ -6,6 +6,7 @@ const empty = { nome: '', email: '', senha: '', creci: '', telefone: '', whatsap
 
 export default function Corretores() {
   const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState(null);
   const [brokers, setBrokers] = useState(null);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState(null);
@@ -82,9 +83,9 @@ export default function Corretores() {
 
       {error && <div className="request-state"><p className="error" role="alert">{error}</p><button className="ghost" onClick={load}>Tentar novamente</button></div>}
       {loading && <p className="muted page-message" role="status">Carregando equipe…</p>}
-      {!loading && !error && brokers?.length === 0 && <p className="empty">Nenhum corretor cadastrado nesta empresa.</p>}
+      {!loading && !error && brokers?.length === 0 && <p className="empty" role="status">Nenhum corretor cadastrado nesta empresa.</p>}
       {brokers?.length > 0 && (
-        <div className="table-wrap">
+        <div className="table-wrap" role="region" aria-label="Equipe de corretores" tabIndex={0}>
           <table className="data-table">
             <thead><tr><th>Corretor</th><th>CRECI</th><th>Telefone</th><th>WhatsApp</th><th>Situação</th><th>Ações</th></tr></thead>
             <tbody>
@@ -100,9 +101,12 @@ export default function Corretores() {
                   <td>{broker.telefone}</td>
                   <td>{broker.whatsapp}</td>
                   <td><span className={`status-pill ${broker.situacao === 'ATIVO' ? 'active' : 'inactive'}`}>{broker.situacao === 'ATIVO' ? 'Ativo' : 'Inativo'}</span></td>
-                  <td><button className={`ghost ${broker.situacao === 'ATIVO' ? 'danger' : ''}`} onClick={() => changeStatus(broker)} disabled={busyId === broker.id}>
-                    {busyId === broker.id ? 'Salvando…' : broker.situacao === 'ATIVO' ? 'Desativar' : 'Ativar'}
-                  </button></td>
+                  <td><div className="row-end">
+                    <button className="ghost" onClick={() => setEditing(broker)}>Editar</button>
+                    <button className={`ghost ${broker.situacao === 'ATIVO' ? 'danger' : ''}`} onClick={() => changeStatus(broker)} disabled={busyId === broker.id}>
+                      {busyId === broker.id ? 'Salvando…' : broker.situacao === 'ATIVO' ? 'Desativar' : 'Ativar'}
+                    </button>
+                  </div></td>
                 </tr>
               ))}
             </tbody>
@@ -111,9 +115,50 @@ export default function Corretores() {
       )}
 
       {open && <NovoCorretor onClose={() => setOpen(false)} onDone={created} />}
+      {editing && <EditarCorretor broker={editing} onClose={() => setEditing(null)} onDone={async () => { setEditing(null); show('Dados do corretor atualizados.'); await load(); }} />}
       {toast}
     </>
   );
+}
+
+function EditarCorretor({ broker, onClose, onDone }) {
+  const [form, setForm] = useState({
+    nome: broker.nome || '', email: broker.email || '', creci: broker.creci || '',
+    telefone: broker.telefone || '', whatsapp: broker.whatsapp || '', apresentacao: broker.apresentacao || '',
+  });
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const update = (key) => (event) => setForm((current) => ({ ...current, [key]: event.target.value }));
+
+  async function submit(event) {
+    event.preventDefault();
+    setBusy(true);
+    setError('');
+    try {
+      await api.put(`/corretor/${broker.id}`, {
+        nome: form.nome.trim(), email: form.email.trim(), creci: form.creci.trim(),
+        telefone: form.telefone.trim(), whatsapp: form.whatsapp.trim(), apresentacao: form.apresentacao.trim(),
+      });
+      await onDone();
+    } catch (requestError) {
+      setError(requestError.message);
+      setBusy(false);
+    }
+  }
+
+  return <Modal title={`Editar corretor · ${broker.nome}`} onClose={onClose}>
+    <form className="form two" onSubmit={submit}>
+      <Field label="Nome"><input value={form.nome} onChange={update('nome')} required maxLength={150} /></Field>
+      <Field label="CRECI"><input value={form.creci} onChange={update('creci')} required maxLength={30} /></Field>
+      <Field label="E-mail"><input type="email" value={form.email} onChange={update('email')} required maxLength={255} /></Field>
+      <Field label="Telefone"><input value={form.telefone} onChange={update('telefone')} required maxLength={20} /></Field>
+      <Field label="WhatsApp"><input value={form.whatsapp} onChange={update('whatsapp')} required maxLength={20} /></Field>
+      <div className="span2"><Field label="Apresentação"><textarea rows={4} value={form.apresentacao} onChange={update('apresentacao')} required /></Field></div>
+      <p className="muted span2">Senha e foto são mantidas por operações próprias da API.</p>
+      {error && <p className="error span2" role="alert">{error}</p>}
+      <div className="row-end span2"><button type="button" className="ghost" onClick={onClose} disabled={busy}>Cancelar</button><button className="primary" disabled={busy}>{busy ? 'Salvando…' : 'Salvar alterações'}</button></div>
+    </form>
+  </Modal>;
 }
 
 function NovoCorretor({ onClose, onDone }) {

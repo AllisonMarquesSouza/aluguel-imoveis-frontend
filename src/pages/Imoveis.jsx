@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api, assetUrl, multipart } from '../api.js';
-import { buildPropertyDto } from '../property-data.js';
+import { useAuth } from '../auth.jsx';
+import { buildPropertyDto, buildPropertyUpdateDto } from '../property-data.js';
+import { buildBuildingDto, buildingFormFromResponse } from '../building-data.js';
 import { Field, Modal, useToast } from '../ui.jsx';
 
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
@@ -27,6 +29,36 @@ const natureLabel = {
 const money = (value) => value == null
   ? '—'
   : new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+const formValue = (value) => value == null ? '' : String(value);
+
+function propertyFormFromResponse(property) {
+  const address = property.endereco || property.apartamento?.predio?.endereco || {};
+  const details = property.casa || property.terreno || property.apartamento || property.lote || {};
+  return {
+    ...emptyForm,
+    codigo: property.codigo || '', titulo: property.titulo || '', proprietarioId: formValue(property.proprietarioId),
+    finalidade: property.finalidade || 'VENDA', valorVenda: formValue(property.valorVenda),
+    valorAluguel: formValue(property.valorAluguel), valorCondominio: formValue(property.valorCondominio),
+    valorIptu: formValue(property.valorIptu), descricao: property.descricao || '',
+    cep: address.cep || '', logradouro: address.logradouro || '', numero: address.numero || '',
+    complemento: address.complemento || '', bairro: address.bairro || '', cidadeId: formValue(address.cidadeId),
+    latitude: formValue(address.latitude), longitude: formValue(address.longitude),
+    areaTerreno: formValue(details.areaTerreno), areaConstruida: formValue(details.areaConstruida),
+    quartos: formValue(details.quartos ?? 0), suites: formValue(details.suites ?? 0),
+    banheiros: formValue(details.banheiros ?? 0), salas: formValue(details.salas ?? 0),
+    vagas: formValue(details.vagas ?? 0), pavimentos: formValue(details.pavimentos ?? 0),
+    anoConstrucao: formValue(details.anoConstrucao ?? 0), piscina: details.piscina ?? false,
+    quintal: details.quintal ?? false, churrasqueira: details.churrasqueira ?? false, mobiliada: details.mobiliada ?? false,
+    areaTotal: formValue(details.areaTotal), frente: formValue(details.frente), fundo: formValue(details.fundo),
+    lateralEsquerda: formValue(details.lateralEsquerda), lateralDireita: formValue(details.lateralDireita),
+    topografia: details.topografia || 'PLANO', muro: details.muro ?? false, esquina: details.esquina ?? false,
+    usoPermitido: details.usoPermitido || '', predioId: formValue(details.predio?.id), andar: formValue(details.andar ?? 0),
+    numeroUnidade: details.numero || '', areaPrivativa: formValue(details.areaPrivativa), varanda: details.varanda ?? false,
+    posicaoSolar: details.posicaoSolar || '', quadraId: formValue(details.quadra?.id), numeroLote: details.numero || '',
+    areaLote: formValue(details.area), frenteLote: formValue(details.frente), fundoLote: formValue(details.fundo),
+    condicoesParcelamento: details.condicoesParcelamento || '',
+  };
+}
 
 function fileIssue(file) {
   if (!file) return '';
@@ -42,6 +74,8 @@ function propertyAddressLabel(property) {
 }
 
 export default function Imoveis() {
+  const { session } = useAuth();
+  const isManager = session?.perfil === 'GESTOR';
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [properties, setProperties] = useState(null);
@@ -53,15 +87,18 @@ export default function Imoveis() {
   const [error, setError] = useState('');
   const [creatingProperty, setCreatingProperty] = useState(false);
   const [creatingBuilding, setCreatingBuilding] = useState(false);
+  const [editingBuilding, setEditingBuilding] = useState(null);
   const [selectedProperty, setSelectedProperty] = useState(null);
+  const [editingProperty, setEditingProperty] = useState(null);
   const [selectedBuilding, setSelectedBuilding] = useState(null);
+  const buildingTriggerRef = useRef(null);
   const [toast, show] = useToast();
 
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
     const results = await Promise.allSettled([
-      api.get('/imovel'), api.get('/predio'), api.get('/cidade'),
+      api.get('/imovel'), isManager ? Promise.resolve([]) : api.get('/predio'), api.get('/cidade'),
       api.get('/caracteristica'), api.get('/loteamento'),
     ]);
     const failures = [];
@@ -78,7 +115,7 @@ export default function Imoveis() {
     else failures.push(`Loteamentos: ${developmentResult.status === 'rejected' ? developmentResult.reason.message : 'formato inesperado da API.'}`);
     setError(failures.join(' '));
     setLoading(false);
-  }, []);
+  }, [isManager]);
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => {
@@ -94,8 +131,9 @@ export default function Imoveis() {
     }
   }
 
-  async function showBuilding(building) {
+  async function showBuilding(building, trigger) {
     setError('');
+    buildingTriggerRef.current = trigger;
     try {
       setSelectedBuilding(await api.get(`/predio/${building.id}`));
     } catch (e) {
@@ -110,9 +148,18 @@ export default function Imoveis() {
     await load();
   }
 
-  async function buildingSaved() {
+  async function buildingSaved(wasEdited = false) {
     setCreatingBuilding(false);
-    show('Prédio cadastrado.');
+    setEditingBuilding(null);
+    setSelectedBuilding(null);
+    show(wasEdited ? 'Prédio atualizado.' : 'Prédio cadastrado.');
+    await load();
+  }
+
+  async function propertyUpdated() {
+    setEditingProperty(null);
+    setSelectedProperty(null);
+    show('Imóvel atualizado.');
     await load();
   }
 
@@ -121,12 +168,12 @@ export default function Imoveis() {
       <header className="page-head">
         <div>
           <h1>Imóveis</h1>
-          <p className="muted">Acervo e prédios disponíveis para a sua empresa, conforme a API.</p>
+          <p className="muted">Acervo e detalhes dos imóveis autorizados para sua empresa.</p>
         </div>
         <div className="row-end">
           <button className="ghost" onClick={load} disabled={loading}>Atualizar</button>
-          <button className="ghost" onClick={() => setCreatingBuilding(true)}>Novo prédio</button>
-          <button className="primary" onClick={() => setCreatingProperty(true)}>Novo imóvel</button>
+          {!isManager && <button className="ghost" onClick={() => setCreatingBuilding(true)}>Novo prédio</button>}
+          {!isManager && <button className="primary" onClick={() => setCreatingProperty(true)}>Novo imóvel</button>}
         </div>
       </header>
 
@@ -135,9 +182,9 @@ export default function Imoveis() {
 
       <section className="card management-section" aria-labelledby="property-list-title">
         <div className="section-head"><div><h2 id="property-list-title">Acervo de imóveis</h2><p className="muted">Status e publicação são apresentados como retornados pela API.</p></div></div>
-        {!loading && properties?.length === 0 && <p className="empty">Nenhum imóvel cadastrado nesta empresa.</p>}
+        {!loading && properties?.length === 0 && <p className="empty" role="status">Nenhum imóvel cadastrado nesta empresa.</p>}
         {properties?.length > 0 && (
-          <div className="table-wrap">
+          <div className="table-wrap" role="region" aria-label="Acervo de imóveis" tabIndex={0}>
             <table className="data-table">
               <thead><tr><th>Código e título</th><th>Natureza</th><th>Proprietário</th><th>Localidade</th><th>Situação</th><th>Publicação</th><th>Ação</th></tr></thead>
               <tbody>{properties.map((property) => (
@@ -156,9 +203,9 @@ export default function Imoveis() {
         )}
       </section>
 
-      <section className="card management-section">
+      {!isManager && <section className="card management-section">
         <div className="section-head"><div><h2>Prédios</h2><p className="muted">Prédios cadastrados para unidades do tipo apartamento.</p></div></div>
-        {!loading && buildings?.length === 0 && <p className="empty">Nenhum prédio cadastrado.</p>}
+        {!loading && buildings?.length === 0 && <p className="empty" role="status">Nenhum prédio cadastrado.</p>}
         {buildings?.length > 0 && (
           <div className="building-grid">
             {buildings.map((building) => (
@@ -166,12 +213,12 @@ export default function Imoveis() {
                 <h3>{building.nome}</h3>
                 <p className="muted">{building.endereco?.cidade} · {building.endereco?.uf}</p>
                 <p>{building.numeroAndares} andares · {building.unidadesPorAndar} unidades por andar</p>
-                <button className="ghost" onClick={() => showBuilding(building)}>Ver detalhes</button>
+                <button className="ghost" onClick={(event) => showBuilding(building, event.currentTarget)}>Ver detalhes</button>
               </article>
             ))}
           </div>
         )}
-      </section>
+      </section>}
 
       {creatingProperty && <NewPropertyForm
         cities={cities} features={features} buildings={buildings || []} developments={developments}
@@ -180,18 +227,28 @@ export default function Imoveis() {
         onClose={() => { setCreatingProperty(false); navigate('/imoveis', { replace: true }); }}
         onDone={propertySaved}
       />}
-      {creatingBuilding && <NewBuildingForm cities={cities} onClose={() => setCreatingBuilding(false)} onDone={buildingSaved} />}
-      {selectedProperty && <PropertyDetails property={selectedProperty} onClose={() => setSelectedProperty(null)} onRefresh={() => showProperty(selectedProperty)} />}
-      {selectedBuilding && <BuildingDetails building={selectedBuilding} onClose={() => setSelectedBuilding(null)} />}
+      {editingProperty && <NewPropertyForm
+        property={editingProperty} isManager={isManager} cities={cities} features={features} buildings={buildings || []} developments={developments}
+        onClose={() => setEditingProperty(null)} onDone={propertyUpdated}
+      />}
+      {creatingBuilding && <BuildingForm cities={cities} onClose={() => setCreatingBuilding(false)} onDone={buildingSaved} />}
+      {editingBuilding && <BuildingForm building={editingBuilding} cities={cities} restoreFocusRef={buildingTriggerRef} onClose={() => setEditingBuilding(null)} onDone={buildingSaved} />}
+      {selectedProperty && <PropertyDetails key={selectedProperty.id} property={selectedProperty} isManager={isManager} onClose={() => setSelectedProperty(null)} onRefresh={() => showProperty(selectedProperty)} onEdit={() => { setEditingProperty(selectedProperty); setSelectedProperty(null); }} />}
+      {selectedBuilding && <BuildingDetails
+        building={selectedBuilding}
+        restoreFocusRef={buildingTriggerRef}
+        onClose={() => setSelectedBuilding(null)}
+        onEdit={() => { setEditingBuilding(selectedBuilding); setSelectedBuilding(null); }}
+      />}
       {toast}
     </>
   );
 }
 
-function NewPropertyForm({ cities, features, buildings, developments, initialNature, initialQuadraId, onClose, onDone }) {
-  const [nature, setNature] = useState(initialNature);
-  const [form, setForm] = useState({ ...emptyForm, quadraId: initialQuadraId });
-  const [featureIds, setFeatureIds] = useState([]);
+function NewPropertyForm({ property = null, isManager = false, cities, features, buildings, developments, initialNature, initialQuadraId, onClose, onDone }) {
+  const [nature, setNature] = useState(property?.natureza || initialNature);
+  const [form, setForm] = useState(() => property ? propertyFormFromResponse(property) : { ...emptyForm, quadraId: initialQuadraId });
+  const [featureIds, setFeatureIds] = useState(() => property?.caracteristicas?.map((feature) => String(feature.id)) || []);
   const [photos, setPhotos] = useState([]);
   const [coverOrder, setCoverOrder] = useState('1');
   const [photoError, setPhotoError] = useState('');
@@ -206,9 +263,15 @@ function NewPropertyForm({ cities, features, buildings, developments, initialNat
     ...quadra, development, label: `${development.nome} · ${quadra.identificacao}`,
   })));
   const selectedQuadra = quadraOptions.find((item) => String(item.id) === String(form.quadraId));
+  const currentAddress = property?.endereco;
+  const selectedCity = currentAddress?.cidadeId
+    ? cities.find((city) => Number(city.id) === Number(currentAddress.cidadeId))
+      || { id: currentAddress.cidadeId, nome: currentAddress.cidade || String(currentAddress.cidadeId), uf: currentAddress.uf || '' }
+    : null;
+  const editCities = property && selectedCity ? [selectedCity] : cities;
   const addressCities = nature === 'LOTE' && selectedQuadra
     ? cities.filter((city) => Number(city.id) === Number(selectedQuadra.development.cidadeId))
-    : cities;
+    : editCities;
 
   useEffect(() => {
     if (nature === 'LOTE' && selectedQuadra) {
@@ -250,15 +313,21 @@ function NewPropertyForm({ cities, features, buildings, developments, initialNat
     event.preventDefault();
     if (!form.proprietarioId) return setError('Pesquise e selecione um proprietário da empresa.');
     if (photoError) return;
-    if (photos.length === 0) return setPhotoError('Envie ao menos uma foto do imóvel.');
-    if (nature === 'APARTAMENTO' && buildings.length === 0) return setError('Cadastre um prédio antes de cadastrar um apartamento.');
+    if (!property && photos.length === 0) return setPhotoError('Envie ao menos uma foto do imóvel.');
+    if (nature === 'APARTAMENTO' && buildings.length === 0 && !property) return setError('Cadastre um prédio antes de cadastrar um apartamento.');
     if (nature === 'LOTE' && !form.quadraId) return setError('Selecione uma quadra cadastrada nesta empresa.');
     setBusy(true);
     setError('');
     setPhotoError('');
     try {
-      const dto = buildPropertyDto(form, nature, featureIds, Number(coverOrder));
-      await api.form('POST', '/imovel', multipart(dto, { fotos: photos }));
+      if (property) {
+        if (!property.corretorId) throw new Error('A API não retornou o corretor vinculado ao imóvel; não é possível atualizar com segurança.');
+        const dto = buildPropertyUpdateDto(form, nature, featureIds, property.corretorId);
+        await api.put(`/imovel/${property.id}`, dto);
+      } else {
+        const dto = buildPropertyDto(form, nature, featureIds, Number(coverOrder));
+        await api.form('POST', '/imovel', multipart(dto, { fotos: photos }));
+      }
       await onDone();
     } catch (e) {
       setError(e.message);
@@ -271,24 +340,25 @@ function NewPropertyForm({ cities, features, buildings, developments, initialNat
   const rentRequired = form.finalidade === 'ALUGUEL' || form.finalidade === 'VENDA_E_ALUGUEL';
 
   return (
-    <Modal title="Cadastrar imóvel" onClose={onClose}>
+    <Modal title={property ? `Editar imóvel · ${property.codigo}` : 'Cadastrar imóvel'} onClose={onClose}>
       <form className="form two property-form" onSubmit={submit}>
-        <div className="span2 inline-notice">A API vincula automaticamente o corretor e a empresa da sessão. A cidade selecionada ainda será validada pelo escopo da empresa.</div>
-        <Field label="Natureza"><select value={nature} onChange={(event) => setNature(event.target.value)}><option value="CASA">Casa</option><option value="TERRENO">Terreno</option><option value="APARTAMENTO">Apartamento</option><option value="LOTE">Lote</option></select></Field>
+        <div className="span2 inline-notice">{property ? 'O corretor, a empresa e o imóvel permanecem no escopo autorizado pela API.' : 'A API vincula automaticamente o corretor e a empresa da sessão. A cidade selecionada ainda será validada pelo escopo da empresa.'}</div>
+        <Field label="Natureza"><select value={nature} onChange={(event) => setNature(event.target.value)} disabled={Boolean(property)}><option value="CASA">Casa</option><option value="TERRENO">Terreno</option><option value="APARTAMENTO">Apartamento</option><option value="LOTE">Lote</option></select></Field>
         <Field label="Código"><input value={form.codigo} onChange={update('codigo')} required maxLength={50} /></Field>
         <div className="span2"><Field label="Título"><input value={form.titulo} onChange={update('titulo')} required maxLength={180} /></Field></div>
         <div className="span2">
-          <div className="owner-search">
+          {!isManager && <div className="owner-search">
             <Field label="Buscar proprietário por nome"><input value={ownerQuery} onChange={(event) => { setOwnerQuery(event.target.value); setForm((current) => ({ ...current, proprietarioId: '' })); setOwners([]); }} maxLength={150} /></Field>
             <button type="button" className="ghost" onClick={searchOwners} disabled={ownerLoading}>{ownerLoading ? 'Buscando…' : 'Buscar'}</button>
-          </div>
+          </div>}
           <Field label="Proprietário">
-            <select value={form.proprietarioId} onChange={update('proprietarioId')} required>
+            <select value={form.proprietarioId} onChange={update('proprietarioId')} required disabled={isManager && Boolean(property)}>
               <option value="">Selecione um resultado da busca</option>
+              {property?.proprietarioId && <option value={String(property.proprietarioId)}>{property.nomeProprietario || `Proprietário ${property.proprietarioId}`} (atual)</option>}
               {owners.map((owner) => <option key={owner.id} value={owner.id}>{owner.nome} · {owner.tipoDocumento} {owner.documento}</option>)}
             </select>
           </Field>
-          {owners.length === 0 && <small>Use a busca para selecionar um proprietário autorizado para sua empresa.</small>}
+          {!isManager && owners.length === 0 && <small>Use a busca para selecionar um proprietário autorizado para sua empresa.</small>}
         </div>
         <Field label="Finalidade"><select value={form.finalidade} onChange={update('finalidade')}><option value="VENDA">Venda</option><option value="ALUGUEL">Aluguel</option><option value="VENDA_E_ALUGUEL">Venda e aluguel</option></select></Field>
         {priceRequired && <Field label="Valor de venda (R$)"><input type="number" min="0" step="0.01" value={form.valorVenda} onChange={update('valorVenda')} required /></Field>}
@@ -298,7 +368,7 @@ function NewPropertyForm({ cities, features, buildings, developments, initialNat
 
         {nature === 'CASA' && <HouseFields form={form} update={update} />}
         {nature === 'TERRENO' && <TerrainFields form={form} update={update} />}
-        {nature === 'APARTAMENTO' && <ApartmentFields form={form} update={update} buildings={buildings} />}
+        {nature === 'APARTAMENTO' && <ApartmentFields form={form} update={update} buildings={buildings} property={property} lockBuilding={isManager} />}
         {nature === 'LOTE' && <LotFields form={form} update={update} quadras={quadraOptions} />}
 
         {nature !== 'APARTAMENTO' && <AddressFields form={form} update={update} cities={addressCities} />}
@@ -306,11 +376,11 @@ function NewPropertyForm({ cities, features, buildings, developments, initialNat
           <Field label="Características"><select multiple size={4} value={featureIds} onChange={(event) => setFeatureIds(Array.from(event.target.selectedOptions, (option) => option.value))}>{features.map((feature) => <option key={feature.id} value={feature.id}>{feature.nome}</option>)}</select></Field>
         </div>
         <div className="span2"><Field label="Descrição (opcional)"><textarea rows={3} value={form.descricao} onChange={update('descricao')} /></Field></div>
-        <div className="span2"><Field label="Fotos (JPEG, PNG ou WebP; até 5 MB cada)" hint="Envie ao menos uma foto. A API limita o arquivo individual a 5 MB."><input type="file" accept="image/jpeg,image/png,image/webp" multiple required onChange={choosePhotos} /></Field></div>
-        {photos.length > 0 && <Field label="Foto de capa"><select value={coverOrder} onChange={(event) => setCoverOrder(event.target.value)}>{photos.map((photo, index) => <option key={`${photo.name}-${index}`} value={index + 1}>{index + 1} · {photo.name}</option>)}</select></Field>}
+        {!property && <div className="span2"><Field label="Fotos (JPEG, PNG ou WebP; até 5 MB cada)" hint="Envie ao menos uma foto. A API limita o arquivo individual a 5 MB."><input type="file" accept="image/jpeg,image/png,image/webp" multiple required onChange={choosePhotos} /></Field></div>}
+        {!property && photos.length > 0 && <Field label="Foto de capa"><select value={coverOrder} onChange={(event) => setCoverOrder(event.target.value)}>{photos.map((photo, index) => <option key={`${photo.name}-${index}`} value={index + 1}>{index + 1} · {photo.name}</option>)}</select></Field>}
         {photoError && <p className="error span2" role="alert">{photoError}</p>}
         {error && <p className="error span2" role="alert">{error}</p>}
-        <div className="row-end span2"><button type="button" className="ghost" onClick={onClose}>Cancelar</button><button className="primary" disabled={busy}>{busy ? 'Cadastrando…' : 'Cadastrar imóvel'}</button></div>
+        <div className="row-end span2"><button type="button" className="ghost" onClick={onClose}>Cancelar</button><button className="primary" disabled={busy}>{busy ? 'Salvando…' : property ? 'Salvar alterações' : 'Cadastrar imóvel'}</button></div>
       </form>
     </Modal>
   );
@@ -350,10 +420,14 @@ function TerrainFields({ form, update }) {
   </>;
 }
 
-function ApartmentFields({ form, update, buildings }) {
+function ApartmentFields({ form, update, buildings, property, lockBuilding }) {
+  const existingBuilding = property?.apartamento?.predio;
+  const selectBuildings = existingBuilding && !buildings.some((item) => Number(item.id) === Number(existingBuilding.id))
+    ? [existingBuilding, ...buildings]
+    : buildings;
   return <>
     <div className="span2"><h3>Dados do apartamento</h3><p className="muted">O endereço e a cidade vêm do prédio selecionado.</p></div>
-    <div className="span2"><Field label="Prédio"><select value={form.predioId} onChange={update('predioId')} required><option value="">Selecione</option>{buildings.map((building) => <option key={building.id} value={building.id}>{building.nome} · {building.endereco?.cidade}</option>)}</select></Field></div>
+    <div className="span2"><Field label="Prédio"><select value={form.predioId} onChange={update('predioId')} required disabled={lockBuilding}><option value="">Selecione</option>{selectBuildings.map((building) => <option key={building.id} value={building.id}>{building.nome} · {building.endereco?.cidade}</option>)}</select></Field></div>
     <NumberField label="Andar" value={form.andar} onChange={update('andar')} integer required />
     <Field label="Número da unidade"><input value={form.numeroUnidade} onChange={update('numeroUnidade')} required maxLength={30} /></Field>
     <NumberField label="Área privativa (m²)" value={form.areaPrivativa} onChange={update('areaPrivativa')} required positive />
@@ -406,8 +480,8 @@ function AddressSummary({ address }) {
   return <p>{[address.logradouro, address.numero, address.complemento, address.bairro, `${address.cidade || ''} ${address.uf || ''}`.trim()].filter(Boolean).join(', ')}</p>;
 }
 
-function BuildingDetails({ building, onClose }) {
-  return <Modal title={building.nome} onClose={onClose}>
+function BuildingDetails({ building, restoreFocusRef, onClose, onEdit }) {
+  return <Modal title={building.nome} restoreFocusRef={restoreFocusRef} onClose={onClose}>
     <div className="detail-stack">
       <AddressSummary address={building.endereco} />
       <dl className="detail-grid">
@@ -416,14 +490,74 @@ function BuildingDetails({ building, onClose }) {
         <div><dt>Condomínio base</dt><dd>{money(building.valorCondominioBase)}</dd></div>
         <div><dt>Estrutura</dt><dd>{[['Portaria 24h', building.portaria24h], ['Piscina', building.piscina], ['Academia', building.academia], ['Salão de festas', building.salaoFestas], ['Playground', building.playground]].filter(([, enabled]) => enabled).map(([label]) => label).join(', ') || '—'}</dd></div>
       </dl>
+      <div className="row-end">
+        <button className="ghost" onClick={onClose}>Fechar</button>
+        <button className="primary" onClick={onEdit}>Editar prédio</button>
+      </div>
     </div>
   </Modal>;
 }
 
-function PropertyDetails({ property, onClose, onRefresh }) {
+function PropertyDetails({ property, isManager, onClose, onRefresh, onEdit }) {
+  const [status, setStatus] = useState(property.situacao || 'DISPONIVEL');
+  const [observation, setObservation] = useState('');
+  const [history, setHistory] = useState(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
   const address = property.endereco || property.apartamento?.predio?.endereco;
   const specifics = property.casa || property.terreno || property.apartamento || property.lote;
   const featureList = (property.caracteristicas || []).map((item) => item.nome).join(', ') || '—';
+
+  useEffect(() => { setStatus(property.situacao || 'DISPONIVEL'); }, [property.situacao]);
+
+  async function changePublication() {
+    setBusy(true);
+    setError('');
+    try {
+      await api.patch(`/imovel/${property.id}/publicacao`, { publicado: !property.publicado });
+      await onRefresh();
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function changeStatus(event) {
+    event.preventDefault();
+    setBusy(true);
+    setError('');
+    try {
+      await api.patch(`/imovel/${property.id}/situacao`, { situacao: status, observacao: observation.trim() });
+      setObservation('');
+      await onRefresh();
+      setHistory(null);
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function showHistory() {
+    if (history !== null) {
+      setHistory(null);
+      return;
+    }
+    setHistoryLoading(true);
+    setError('');
+    try {
+      const result = await api.get(`/imovel/${property.id}/historico-situacao`);
+      if (!Array.isArray(result)) throw new Error('A API retornou o histórico em formato inesperado.');
+      setHistory(result);
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setHistoryLoading(false);
+    }
+  }
+
   return <Modal title={`${property.codigo} · ${property.titulo}`} onClose={onClose}>
     <div className="detail-stack">
       <div className="property-detail-top"><span className={`status-pill ${property.situacao === 'DISPONIVEL' ? 'active' : 'inactive'}`}>{property.situacao || '—'}</span><span className="pill">{property.publicado ? 'Publicado' : 'Não publicado'}</span></div>
@@ -441,10 +575,166 @@ function PropertyDetails({ property, onClose, onRefresh }) {
       {specifics && <section><h3>Dados de {natureLabel[property.natureza]?.toLowerCase()}</h3><dl className="detail-grid">{Object.entries(specifics).filter(([, value]) => value == null || typeof value !== 'object').map(([key, value]) => <div key={key}><dt>{humanize(key)}</dt><dd>{typeof value === 'boolean' ? (value ? 'Sim' : 'Não') : value ?? '—'}</dd></div>)}</dl></section>}
       <section><h3>Características</h3><p>{featureList}</p></section>
       {property.descricao && <section><h3>Descrição</h3><p>{property.descricao}</p></section>}
-      <section><h3>Fotos</h3><PropertyImages property={property} onRefresh={onRefresh} /></section>
-      <p className="muted">Publicação e situação são apresentadas como retornadas pela API. As ações de gestão pertencem ao perfil gestor, mas a API não oferece a esse perfil uma lista autorizada de imóveis.</p>
+      <section><h3>Fotos</h3>{isManager ? <PropertyPhotoGallery property={property} /> : <PropertyImages property={property} onRefresh={onRefresh} />}</section>
+      {isManager && <section className="property-management-actions">
+        <h3>Gestão do imóvel</h3>
+        <div className="row-end"><button className="ghost" onClick={changePublication} disabled={busy}>{busy ? 'Salvando…' : property.publicado ? 'Retirar da vitrine' : 'Publicar na vitrine'}</button><button className="ghost" onClick={showHistory} disabled={historyLoading}>{historyLoading ? 'Carregando…' : history ? 'Ocultar histórico' : 'Ver histórico'}</button></div>
+        <form className="form two" onSubmit={changeStatus}>
+          <Field label="Situação"><select value={status} onChange={(event) => setStatus(event.target.value)}><option value="DISPONIVEL">Disponível</option><option value="RESERVADO">Reservado</option><option value="VENDIDO">Vendido</option><option value="ALUGADO">Alugado</option></select></Field>
+          <Field label="Observação" hint="Obrigatória para registrar a alteração."><input value={observation} onChange={(event) => setObservation(event.target.value)} required maxLength={2000} /></Field>
+          <div className="row-end span2"><button className="primary" disabled={busy || status === property.situacao}>{busy ? 'Salvando…' : 'Atualizar situação'}</button></div>
+        </form>
+        {error && <p className="error" role="alert">{error}</p>}
+        {history && <div className="history-list" aria-label="Histórico de situação">{history.length === 0 ? <p className="muted">Ainda não há alterações registradas.</p> : history.map((entry) => <article key={entry.id}><strong>{entry.situacaoAnterior || 'Criação'} → {entry.situacaoNova}</strong><small>{entry.autorNome || 'Usuário'} · {entry.alteradoEm ? new Date(entry.alteradoEm).toLocaleString('pt-BR') : '—'}</small><p>{entry.observacao || '—'}</p></article>)}</div>}
+      </section>}
+      {isManager && <PropertyDocuments property={property} />}
+      <div className="row-end"><button className="ghost" onClick={onClose}>Fechar</button><button className="primary" onClick={onEdit}>Editar imóvel</button></div>
     </div>
   </Modal>;
+}
+
+function PropertyPhotoGallery({ property }) {
+  if (!property.fotos?.length) return <p className="muted">Nenhuma foto retornada pela API.</p>;
+  return <div className="photo-grid">{property.fotos.map((photo) => <article className="photo-card" key={photo.imagemId || photo.id}>
+    <img src={assetUrl(photo.url)} alt={`Foto ${photo.ordem} de ${property.titulo}`} />
+    <strong>{photo.capa ? 'Capa' : `Foto ${photo.ordem}`}</strong>
+  </article>)}</div>;
+}
+
+const DOCUMENT_TYPES = [
+  ['MATRICULA', 'Matrícula'],
+  ['CARNE_IPTU', 'Carnê de IPTU'],
+  ['AUTORIZACAO_PROPRIETARIO', 'Autorização do proprietário'],
+];
+const DOCUMENT_TYPES_ALLOWED = new Set(['application/pdf', 'image/jpeg', 'image/png', 'image/webp']);
+
+function PropertyDocuments({ property }) {
+  const [documents, setDocuments] = useState(null);
+  const [tipo, setTipo] = useState('MATRICULA');
+  const [date, setDate] = useState('');
+  const [file, setFile] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    setDocuments(null);
+    try {
+      const result = await api.get(`/imovel/${property.id}/documentos`);
+      if (!Array.isArray(result)) throw new Error('A API retornou os documentos em formato inesperado.');
+      setDocuments(result);
+      setTipo((current) => result.some((document) => document.tipo === current)
+        ? DOCUMENT_TYPES.find(([value]) => !result.some((document) => document.tipo === value))?.[0] || current
+        : current);
+    } catch (requestError) {
+      setError(requestError.message);
+      setDocuments(null);
+    } finally {
+      setLoading(false);
+    }
+  }, [property.id]);
+
+  useEffect(() => { load(); }, [load]);
+
+  function validate(selected) {
+    if (!selected) return 'Selecione um arquivo.';
+    if (!DOCUMENT_TYPES_ALLOWED.has(selected.type)) return 'Use um arquivo PDF, JPEG, PNG ou WebP.';
+    if (selected.size > MAX_IMAGE_SIZE) return 'O arquivo pode ter no máximo 5 MB.';
+    return '';
+  }
+
+  async function submit(event) {
+    event.preventDefault();
+    const issue = validate(file);
+    if (issue) return setError(issue);
+    setBusy(true);
+    setError('');
+    try {
+      const form = new FormData();
+      form.append('tipo', tipo);
+      form.append('dataDocumento', date);
+      form.append('arquivo', file);
+      await api.form('POST', `/imovel/${property.id}/documentos`, form);
+      setFile(null);
+      setDate('');
+      await load();
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function download(document) {
+    setBusy(true);
+    setError('');
+    try {
+      const { blob, filename } = await api.download(`/imovel/${property.id}/documentos/${document.id}/arquivo`);
+      const url = URL.createObjectURL(blob);
+      const anchor = window.document.createElement('a');
+      anchor.href = url;
+      anchor.download = (filename || document.nomeArquivo || 'documento').split(/[\\/]/).pop().replace(/[\u0000-\u001f\u007f]/g, '') || 'documento';
+      window.document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return <section className="property-documents">
+    <h3>Documentos</h3>
+    {loading && <p className="muted" role="status">Carregando documentos…</p>}
+    {documents?.length === 0 && <p className="muted" role="status">Nenhum documento cadastrado.</p>}
+    {documents?.length > 0 && <ul className="document-list">{documents.map((document) => <li key={document.id}>
+      <div><strong>{DOCUMENT_TYPES.find(([value]) => value === document.tipo)?.[1] || document.tipo}</strong><small>{document.nomeArquivo} · {document.dataDocumento || 'Sem data'}</small></div>
+      <div className="row-end"><button className="ghost" type="button" onClick={() => download(document)} disabled={busy}>Baixar</button><DocumentReplace document={document} propertyId={property.id} onDone={load} disabled={busy} /></div>
+    </li>)}</ul>}
+    {!loading && documents?.length === DOCUMENT_TYPES.length && <p className="muted">A API permite um documento de cada tipo; todos os tipos disponíveis já estão cadastrados.</p>}
+    {!loading && documents && documents.length < DOCUMENT_TYPES.length && <form className="form two" onSubmit={submit}>
+      <Field label="Tipo de documento"><select value={tipo} onChange={(event) => setTipo(event.target.value)}>{DOCUMENT_TYPES.map(([value, label]) => <option key={value} value={value} disabled={documents.some((document) => document.tipo === value)}>{label}{documents.some((document) => document.tipo === value) ? ' (já cadastrado)' : ''}</option>)}</select></Field>
+      <Field label="Data do documento"><input type="date" value={date} onChange={(event) => setDate(event.target.value)} required /></Field>
+      <div className="span2"><Field label="Arquivo PDF, JPEG, PNG ou WebP; até 5 MB"><input type="file" accept="application/pdf,image/jpeg,image/png,image/webp" onChange={(event) => { const selected = event.target.files?.[0] || null; setFile(selected); setError(selected ? validate(selected) : ''); }} required /></Field></div>
+      {error && <p className="error span2" role="alert">{error}</p>}
+      <div className="row-end span2"><button className="primary" disabled={busy || !file}>{busy ? 'Enviando…' : 'Adicionar documento'}</button></div>
+    </form>}
+    {error && !documents && <div className="request-state"><p className="error" role="alert">{error}</p><button className="ghost" onClick={load}>Tentar novamente</button></div>}
+  </section>;
+}
+
+function DocumentReplace({ document, propertyId, onDone, disabled }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [date, setDate] = useState(document.dataDocumento || '');
+
+  async function replace(event) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    if (!DOCUMENT_TYPES_ALLOWED.has(file.type)) return setError('Use um arquivo PDF, JPEG, PNG ou WebP.');
+    if (file.size > MAX_IMAGE_SIZE) return setError('O arquivo pode ter no máximo 5 MB.');
+    if (!date) return setError('Informe a data do documento.');
+    setBusy(true);
+    setError('');
+    try {
+      const form = new FormData();
+      form.append('dataDocumento', date);
+      form.append('arquivo', file);
+      await api.form('PUT', `/imovel/${propertyId}/documentos/${document.id}`, form);
+      await onDone();
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return <div className="document-replace"><Field label={`Data para ${document.nomeArquivo}`}><input type="date" value={date} disabled={disabled || busy} onChange={(event) => setDate(event.target.value)} /></Field><label className="ghost file-action">{busy ? 'Enviando…' : 'Substituir'}<input aria-label={`Substituir ${document.nomeArquivo}`} type="file" accept="application/pdf,image/jpeg,image/png,image/webp" disabled={disabled || busy} onChange={replace} /></label>{error && <small className="error" role="alert">{error}</small>}</div>;
 }
 
 function PropertyImages({ property, onRefresh }) {
@@ -514,8 +804,12 @@ function humanize(value) {
   return value.replace(/([A-Z])/g, ' $1').replace(/^./, (letter) => letter.toUpperCase());
 }
 
-function NewBuildingForm({ cities, onClose, onDone }) {
-  const [form, setForm] = useState({ nome: '', cidadeId: '', cep: '', logradouro: '', numero: '', complemento: '', bairro: '', latitude: '', longitude: '', numeroAndares: '', unidadesPorAndar: '', anoConstrucao: '0', elevadores: '0', portaria24h: false, piscina: false, academia: false, salaoFestas: false, playground: false, valorCondominioBase: '0' });
+function BuildingForm({ building = null, cities, restoreFocusRef, onClose, onDone }) {
+  const [form, setForm] = useState(() => building ? buildingFormFromResponse(building) : {
+    nome: '', cidadeId: '', cep: '', logradouro: '', numero: '', complemento: '', bairro: '', latitude: '', longitude: '',
+    numeroAndares: '', unidadesPorAndar: '', anoConstrucao: '0', elevadores: '0', portaria24h: false, piscina: false,
+    academia: false, salaoFestas: false, playground: false, valorCondominioBase: '0',
+  });
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const update = (key) => (event) => setForm((current) => ({ ...current, [key]: event.target.value }));
@@ -525,27 +819,17 @@ function NewBuildingForm({ cities, onClose, onDone }) {
     setBusy(true);
     setError('');
     try {
-      await api.post('/predio', {
-        nome: form.nome.trim(),
-        endereco: {
-          cep: form.cep.trim(), logradouro: form.logradouro.trim(), numero: form.numero.trim(),
-          complemento: form.complemento.trim() || null, bairro: form.bairro.trim(), cidadeId: Number(form.cidadeId),
-          latitude: Number(form.latitude), longitude: Number(form.longitude),
-        },
-        numeroAndares: Number(form.numeroAndares), unidadesPorAndar: Number(form.unidadesPorAndar),
-        anoConstrucao: Number(form.anoConstrucao), elevadores: Number(form.elevadores),
-        portaria24h: form.portaria24h, piscina: form.piscina, academia: form.academia,
-        salaoFestas: form.salaoFestas, playground: form.playground,
-        valorCondominioBase: Number(form.valorCondominioBase),
-      });
-      await onDone();
+      const dto = buildBuildingDto(form);
+      if (building) await api.put(`/predio/${building.id}`, dto);
+      else await api.post('/predio', dto);
+      await onDone(Boolean(building));
     } catch (e) {
       setError(e.message);
       setBusy(false);
     }
   }
 
-  return <Modal title="Cadastrar prédio" onClose={onClose}>
+  return <Modal title={building ? `Editar prédio · ${building.nome}` : 'Cadastrar prédio'} restoreFocusRef={restoreFocusRef} onClose={onClose}>
     <form className="form two" onSubmit={submit}>
       <div className="span2 inline-notice">A cidade será validada pela API conforme a área de atuação da empresa.</div>
       <div className="span2"><Field label="Nome"><input value={form.nome} onChange={update('nome')} required maxLength={180} /></Field></div>
@@ -564,7 +848,7 @@ function NewBuildingForm({ cities, onClose, onDone }) {
       <NumberField label="Condomínio base (R$)" value={form.valorCondominioBase} onChange={update('valorCondominioBase')} required />
       {['portaria24h', 'piscina', 'academia', 'salaoFestas', 'playground'].map((key) => <BooleanField key={key} label={humanize(key)} value={form[key]} onChange={update(key)} />)}
       {error && <p className="error span2" role="alert">{error}</p>}
-      <div className="row-end span2"><button type="button" className="ghost" onClick={onClose}>Cancelar</button><button className="primary" disabled={busy}>{busy ? 'Cadastrando…' : 'Cadastrar prédio'}</button></div>
+      <div className="row-end span2"><button type="button" className="ghost" onClick={onClose}>Cancelar</button><button className="primary" disabled={busy}>{busy ? 'Salvando…' : building ? 'Salvar alterações' : 'Cadastrar prédio'}</button></div>
     </form>
   </Modal>;
 }

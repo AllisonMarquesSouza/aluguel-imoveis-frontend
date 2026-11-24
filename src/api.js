@@ -49,7 +49,7 @@ const FALLBACK = {
   415: 'Tipo de conteúdo não suportado.',
 };
 
-async function request(method, path, { json, form, auth = true } = {}) {
+async function request(method, path, { json, form, auth = true, responseType = 'json' } = {}) {
   const headers = {};
   const requestToken = auth ? token : null;
   if (requestToken) headers.Authorization = `Bearer ${requestToken}`;
@@ -76,15 +76,27 @@ async function request(method, path, { json, form, auth = true } = {}) {
     throw new ApiError(message || FALLBACK[res.status] || `Erro ${res.status}`, res.status);
   }
   if (res.status === 204) return null;
+  if (responseType === 'blob') {
+    const disposition = res.headers.get('content-disposition') || '';
+    const encodedName = disposition.match(/filename\*=UTF-8''([^;]+)/i)?.[1];
+    const plainName = disposition.match(/filename="?([^";]+)"?/i)?.[1];
+    let filename = plainName || 'arquivo';
+    if (encodedName) {
+      try { filename = decodeURIComponent(encodedName); } catch { filename = encodedName; }
+    }
+    return { blob: await res.blob(), filename };
+  }
   return (res.headers.get('content-type') || '').includes('json') ? res.json() : null;
 }
 
 export const api = {
   get: (path) => request('GET', path),
   post: (path, json, opts) => request('POST', path, { json, ...opts }),
-  patch: (path) => request('PATCH', path),
+  put: (path, json) => request('PUT', path, { json }),
+  patch: (path, json) => request('PATCH', path, json === undefined ? {} : { json }),
   delete: (path) => request('DELETE', path),
   form: (method, path, form) => request(method, path, { form }),
+  download: (path) => request('GET', path, { responseType: 'blob' }),
 };
 
 // Monta o multipart que a API espera: parte "dto" (JSON) + arquivos.

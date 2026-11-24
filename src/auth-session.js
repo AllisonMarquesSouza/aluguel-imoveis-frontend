@@ -1,4 +1,5 @@
 const PERFIS = new Set(['ADMINISTRADOR', 'GESTOR', 'CORRETOR', 'CLIENTE']);
+const PERFIS_DO_PAINEL = new Set(['ADMINISTRADOR', 'GESTOR', 'CORRETOR']);
 
 function decodePayload(token) {
   if (typeof token !== 'string') return null;
@@ -46,4 +47,8 @@ export function readSession(token, now = Date.now(), profileFallback = null) {
 // Fail closed: perfil ausente ou não reconhecido nunca libera uma ação condicionada.
 export function can(session, ...perfis) {
   return Boolean(session?.perfil && perfis.includes(session.perfil));
+}
+
+export function canAccessPanel(session) {
+  return Boolean(session?.perfil && PERFIS_DO_PAINEL.has(session.perfil));
 }

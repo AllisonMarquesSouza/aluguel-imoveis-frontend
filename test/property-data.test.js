@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { buildPropertyDto } from '../src/property-data.js';
+import { buildPropertyDto, buildPropertyUpdateDto } from '../src/property-data.js';
 
 const form = {
   codigo: 'IM-12', titulo: 'Imóvel teste', proprietarioId: '8', finalidade: 'VENDA_E_ALUGUEL',
@@ -59,4 +59,13 @@ test('LOTE DTO includes lot, quadra and address data only', () => {
   assert.equal('casa' in dto, false);
   assert.equal('terreno' in dto, false);
   assert.equal('apartamento' in dto, false);
+});
+
+test('property update DTO includes the existing broker and omits creation photo fields', () => {
+  const dto = buildPropertyUpdateDto(form, 'CASA', ['1'], '15');
+  assert.equal(dto.corretorId, 15);
+  assert.equal(dto.casa.areaConstruida, 120);
+  assert.equal(dto.endereco.cidadeId, 3);
+  assert.equal('fotoCapaOrdem' in dto, false);
+  assert.equal('fotos' in dto, false);
 });

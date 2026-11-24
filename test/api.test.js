@@ -59,6 +59,64 @@ test('403 does not end an authenticated session', async () => {
   restore();
 });
 
+test('PUT sends a JSON update and returns the API representation', async () => {
+  setToken('building-token');
+  globalThis.fetch = async (url, options) => {
+    assert.equal(url, '/api/predio/12');
+    assert.equal(options.method, 'PUT');
+    assert.equal(options.headers.Authorization, 'Bearer building-token');
+    assert.equal(options.headers['Content-Type'], 'application/json');
+    assert.deepEqual(JSON.parse(options.body), { nome: 'Edifício Aurora' });
+    return new Response(JSON.stringify({ id: 12, nome: 'Edifício Aurora' }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+  };
+
+  assert.deepEqual(await api.put('/predio/12', { nome: 'Edifício Aurora' }), { id: 12, nome: 'Edifício Aurora' });
+});
+
+test('PATCH sends its JSON body when the endpoint requires an update payload', async () => {
+  setToken('update-token');
+  globalThis.fetch = async (_url, options) => {
+    assert.equal(options.method, 'PATCH');
+    assert.equal(options.headers.Authorization, 'Bearer update-token');
+    assert.equal(options.headers['Content-Type'], 'application/json');
+    assert.deepEqual(JSON.parse(options.body), { retorno: 'FALEI' });
+    return new Response(JSON.stringify({ id: 5, retorno: 'FALEI' }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+  };
+
+  assert.deepEqual(await api.patch('/contatos/5/retorno', { retorno: 'FALEI' }), { id: 5, retorno: 'FALEI' });
+});
+
+test('authenticated download returns the file blob and decoded filename', async () => {
+  setToken('download-token');
+  globalThis.fetch = async (_url, options) => {
+    assert.equal(options.method, 'GET');
+    assert.equal(options.headers.Authorization, 'Bearer download-token');
+    return new Response(new Blob(['private document'], { type: 'application/pdf' }), {
+      status: 200,
+      headers: { 'content-type': 'application/pdf', 'content-disposition': "attachment; filename*=UTF-8''matricula%20imovel.pdf" },
+    });
+  };
+
+  const result = await api.download('/imovel/7/documentos/9/arquivo');
+  assert.equal(result.filename, 'matricula imovel.pdf');
+  assert.equal(await result.blob.text(), 'private document');
+});
+
+test('successful list responses preserve an empty collection for the empty state', async () => {
+  globalThis.fetch = async () => new Response('[]', {
+    status: 200,
+    headers: { 'content-type': 'application/json' },
+  });
+
+  assert.deepEqual(await api.get('/predio'), []);
+});
+
 test('stores the returned profile with the token and clears both on logout', () => {
   setToken('current-token', 'CORRETOR');
   assert.equal(getStoredProfile(), 'CORRETOR');
