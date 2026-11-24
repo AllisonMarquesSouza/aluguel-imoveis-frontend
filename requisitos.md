@@ -335,7 +335,6 @@ Uma funcionalidade só deve ser considerada concluída quando:
 
 - O front-end persiste o JWT em `localStorage`, mas a estratégia de armazenamento deve ser reavaliada junto ao mecanismo de autenticação do backend antes de ampliar a sessão para produção.
 - `POST /auth/login` retorna `{ token, perfil }`. O front-end persiste o perfil junto ao token somente para navegação; a API continua responsável por validar permissões em cada operação. Uma alteração de perfil pode exigir novo login para atualizar a navegação local.
-- A API ainda não oferece uma lista de cidades filtrada pela área de atuação da empresa. `GET /cidade` retorna o catálogo geral e o servidor valida o escopo ao salvar.
 - A camada de contratos, os endpoints de parcelas/pagamentos e os relatórios ainda não foram disponibilizados na API.
 - Para o front-end, validar cada imagem/documento em até 5 MB e aceitar somente os formatos definidos para cada fluxo. A configuração da API consultada permite até 50 MB por requisição; manter os limites da interface alinhados aos validadores reais e revisar esta nota se o contrato mudar.
 - A área de mapas permanece opcional e sem decisão de biblioteca; não deve bloquear os formulários sem requisito específico.
@@ -399,7 +398,7 @@ O inventário abaixo evita transformar requisitos de negócio em endpoints presu
 - **Contexto da empresa:** `GET /empresa/atual` retorna a empresa vinculada ao gestor e os dados necessários para administrar sua própria logomarca.
 - **Contatos:** corretor e gestor consultam a caixa autorizada; filtros aceitos são `imovelId`, `dataInicio` e `dataFim`. Apenas o corretor responsável pode atualizar `retorno`. O registro público de contato pertence à vitrine, fora deste painel.
 - **Contratos, parcelas/pagamentos e relatórios:** não foram encontrados controladores ou DTOs desses domínios na API consultada. T-11 permanece fora deste escopo conforme solicitado; T-12 e T-13 aguardam contrato da API.
-- **Cidades:** `GET /cidade` retorna o catálogo geral, sem filtro pela área de atuação da empresa. O servidor valida o escopo ao gravar; a API ainda precisa expor as cidades elegíveis para evitar opções que serão recusadas.
+- **Cidades:** `GET /cidade` retorna o catálogo geral; `GET /cidade/empresa` retorna as cidades da empresa do usuário autenticado para gestores e corretores. O front usa a rota por empresa nos formulários de imóveis e loteamentos.
 
 Este inventário foi conferido no repositório e na documentação local da API em 24/11/2026. Revalidar os contratos antes de iniciar integrações futuras, pois o backend pode evoluir.
 
@@ -447,7 +446,7 @@ Esta lista separa o que já existe no painel do que ainda falta fazer. O andamen
 
 - **Implementado:** corretor mantém consulta, cadastro e edição de prédios e imóveis. Corretor e gestor consultam e editam imóveis dentro da empresa autorizada.
 - **Gestão do imóvel pelo gestor:** alterar publicação e situação, consultar histórico e editar dados comuns com o bloco específico da natureza.
-- **Resultado:** situação e publicação só são consideradas atualizadas após resposta da API. A cidade existente é mantida durante a edição enquanto não houver lista de cidades autorizadas para escolha.
+- **Resultado:** situação e publicação só são consideradas atualizadas após resposta da API. A seleção de cidade usa o catálogo autorizado da empresa retornado por `GET /cidade/empresa`.
 
 #### T-08 — Loteamentos, quadras e lotes — **Concluída**
 
