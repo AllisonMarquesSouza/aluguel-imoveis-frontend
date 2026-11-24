@@ -19,21 +19,22 @@ Defina `VITE_API_URL` com a URL pública da API e **libere CORS** nela para o do
 - Visão geral com consultas selecionadas conforme o perfil autenticado
 - Empresas: consulta, cadastro de imobiliária/autônoma, edição, ativação/desativação e remoção (administrador)
 - Cadastros auxiliares: cidades e características (administrador)
-- Corretores: cadastro com foto, consulta de ativos e inativos da própria imobiliária e ativação/desativação pelo gestor; edição dos dados profissionais aguarda uma operação na API
-- Proprietários: busca por nome/documento e cadastro para corretor
-- Acervo para corretor: consulta/detalhe de imóveis, cadastro por natureza, prédios e gestão das fotos autorizadas pela API
-- Loteamentos para corretor: consulta hierárquica, cadastro de loteamentos/quadras e acesso ao cadastro de lotes pelo acervo
-- Logomarcas de empresas: inclusão, substituição e remoção por administrador
-- Usuários: criação de contas gerais por `POST /auth/register` (administrador); consulta, edição e status não estão disponíveis no contrato atual da API. Cadastros profissionais de corretor seguem os fluxos separados de empresa autônoma e equipe da imobiliária.
+- Corretores: cadastro com foto, consulta de ativos/inativos, edição dos dados profissionais e ativação/desativação pelo gestor da empresa
+- Usuários: criação de contas gerais pelo administrador; consulta, edição de nome/e-mail e alteração de situação por administrador/gestor no escopo autorizado
+- Senha: qualquer perfil autenticado aceito pela API pode alterar a própria senha confirmando a senha atual
+- Proprietários: busca por nome/documento, cadastro e edição para corretor
+- Acervo de imóveis: corretor cadastra imóveis por natureza e mantém prédios/fotos; corretor e gestor consultam e editam imóveis autorizados, e o gestor administra publicação, situação, histórico e documentos
+- Loteamentos: corretor cadastra loteamentos/quadras e lotes; gestor consulta os lotes da empresa e solicita mudança de situação
+- Logomarcas: administrador gerencia as empresas; gestor gerencia somente a empresa vinculada à sessão
+- Contatos: corretor e gestor consultam a caixa autorizada com filtros por imóvel/período; somente o corretor responsável registra o retorno
+- Cadastros profissionais de corretor seguem os fluxos separados de empresa autônoma e equipe da imobiliária.
 
 ## Pontos a conferir
-- O JWT continua sem claim de perfil; o front-end usa o campo `perfil` retornado junto ao token no login e o guarda apenas para controlar a navegação. A API continua sendo a autoridade de autenticação e autorização em cada operação.
+- O front-end usa o campo `perfil` retornado junto ao token no login e o guarda apenas para controlar a navegação. A API continua sendo a autoridade de autenticação e autorização em cada operação.
 - Depois de atualizar a API, encerre uma sessão iniciada antes dessa mudança e entre novamente para receber o campo `perfil`.
 - O `GET /corretor` da API é público e retorna perfis ativos sem limitar a empresa; o painel não o usa como lista de gestão da equipe.
 - `GET /corretor/empresa/ativos` e `GET /corretor/empresa/inativos` retornam listas limitadas à empresa do gestor autenticado; o painel usa essas rotas para oferecer ativação e desativação.
-- A API ainda não oferece uma operação para editar os dados profissionais de um corretor.
 - O `POST /auth/register` aceita `CORRETOR`, mas cria apenas um usuário. O formulário geral não oferece esse perfil: corretor autônomo é criado com a empresa por `POST /empresa/autonoma`, e corretor de imobiliária pelo gestor em `POST /corretor`.
-- A API não documenta endpoints de contatos, atendimento, contratos, parcelas, pagamentos ou relatórios.
 - Os validadores atuais da API aceitam imagens JPEG, PNG e WebP de até 5 MB; documentos aceitam PDF, JPEG, PNG e WebP de até 5 MB. A configuração de implantação precisa permitir esses limites.
-- As ações de publicação/situação e documentos são do gestor, mas os endpoints `GET /imovel` e `GET /imovel/{id}` exigem corretor. As telas aguardam uma consulta de imóveis com escopo de gestor antes de expor essas ações.
-- O endpoint `GET /cidade` retorna o catálogo geral. O servidor valida se a cidade pertence à área de atuação da empresa; a API ainda não fornece uma lista de cidades autorizadas para popular o seletor.
+- O endpoint `GET /cidade` retorna o catálogo geral. O servidor valida se a cidade pertence à área de atuação da empresa; a API ainda não fornece uma lista de cidades autorizadas para popular os formulários de cadastro.
+- A camada de contratos permanece fora desta implementação. A API consultada também não oferece endpoints de parcelas/pagamentos ou relatórios.

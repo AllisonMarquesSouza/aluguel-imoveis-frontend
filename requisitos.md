@@ -91,6 +91,7 @@ Os requisitos abaixo descrevem o comportamento esperado do painel. Eles não det
 ### RF-01 — Autenticação
 
 - Permitir que o usuário informe suas credenciais e entre no sistema.
+- Permitir que o usuário autenticado altere a própria senha, confirmando a senha atual e respeitando os limites definidos pela API.
 - Exibir mensagens claras para credenciais inválidas, sessão expirada e falhas de comunicação.
 - Permitir encerrar a sessão.
 - Proteger as rotas administrativas.
@@ -119,6 +120,7 @@ Os requisitos abaixo descrevem o comportamento esperado do painel. Eles não det
 - Exibir perfil e situação do usuário.
 - Tratar os estados `ATIVO`, `INATIVO` e `BLOQUEADO` conforme os enums efetivos da API.
 - Não permitir que a interface altere o próprio perfil ou vínculo empresarial fora das operações autorizadas.
+- Disponibilizar a troca da própria senha para os perfis autorizados pela API.
 
 ### RF-05 — Corretores
 
@@ -332,9 +334,9 @@ Uma funcionalidade só deve ser considerada concluída quando:
 ### 9.2 Pendências que dependem de decisão ou alinhamento com a API
 
 - O front-end persiste o JWT em `localStorage`, mas a estratégia de armazenamento deve ser reavaliada junto ao mecanismo de autenticação do backend antes de ampliar a sessão para produção.
-- O JWT emitido pela API contém emissor, assunto (`sub`, o e-mail) e expiração; não contém o perfil. No checkout local da API consultado em 23/11/2026, `POST /auth/login` retorna `{ token, perfil }`, sendo `perfil` um dos valores de `UsuarioPerfil`. O front-end persiste esse perfil junto ao token somente para navegação; a API continua responsável por validar permissões em cada operação. Uma alteração de perfil pode exigir novo login para atualizar a navegação local.
-- A política de edição de imóveis, proprietários e usuários depende de operações de atualização que não estão presentes no contrato atual da API.
-- O requisito de gestão de contatos, contratos, parcelas, pagamentos e relatórios depende de esses domínios e suas regras serem definidos e disponibilizados pela API.
+- `POST /auth/login` retorna `{ token, perfil }`. O front-end persiste o perfil junto ao token somente para navegação; a API continua responsável por validar permissões em cada operação. Uma alteração de perfil pode exigir novo login para atualizar a navegação local.
+- A API ainda não oferece uma lista de cidades filtrada pela área de atuação da empresa. `GET /cidade` retorna o catálogo geral e o servidor valida o escopo ao salvar.
+- A camada de contratos, os endpoints de parcelas/pagamentos e os relatórios ainda não foram disponibilizados na API.
 - Para o front-end, validar cada imagem/documento em até 5 MB e aceitar somente os formatos definidos para cada fluxo. A configuração da API consultada permite até 50 MB por requisição; manter os limites da interface alinhados aos validadores reais e revisar esta nota se o contrato mudar.
 - A área de mapas permanece opcional e sem decisão de biblioteca; não deve bloquear os formulários sem requisito específico.
 
@@ -386,19 +388,20 @@ O estado atual oferece uma base visual navegável e estes fluxos parciais: login
 
 O inventário abaixo evita transformar requisitos de negócio em endpoints presumidos:
 
-- **Sessão:** `JWTService` emite `sub` (e-mail), emissor e expiração de duas horas, sem claim de perfil. No checkout local consultado, `TokenDto` e `POST /auth/login` retornam `token` e `perfil`; o serviço preenche o perfil com `usuario.getPerfil()`. O front-end usa o campo para navegação, enquanto a API revalida permissões no backend.
-- **Usuários:** `POST /auth/register` exige administrador. Não foi identificada API de listagem/consulta, edição ou alteração de status, nem gestão de usuários da própria empresa pelo gestor.
-- **Empresas:** os endpoints necessários às operações de empresa previstas em RF-03 estão documentados para administrador.
-- **Corretores:** `GET /corretor/empresa/ativos` e `GET /corretor/empresa/inativos` listam os registros da empresa do gestor autenticado por situação; cadastro e ativação/desativação também são limitados à empresa do gestor. Não foi identificado endpoint de edição dos dados profissionais do corretor.
-- **Tipos de cadastro de corretor:** `POST /empresa/autonoma` cadastra uma empresa autônoma junto com o corretor proprietário; `POST /corretor` cadastra um corretor vinculado à imobiliária do gestor. `POST /auth/register` aceita o perfil `CORRETOR`, mas cria somente um usuário, sem o registro profissional necessário às operações do acervo.
-- **Proprietários:** busca por nome/documento e cadastro para corretor ativo da empresa. Não foi identificada atualização.
-- **Cidades e características:** existem consultas; há operações administrativas documentadas para criar/remover cidades e criar características.
-- **Prédios e imóveis:** existem cadastro e consulta de prédios e imóveis, incluindo dados específicos de casa, terreno, apartamento e lote. A gestão de imóvel cobre publicação, situação e documentos; o controlador de imóvel não expõe edição do cadastro comum.
-- **Loteamentos:** existem listagem/detalhe, criação de loteamento e quadra, vínculo de lote por cadastro de imóvel e mudança de situação.
-- **Imagens e documentos:** há endpoints de gestão com autorização. A interface deve usar as permissões, partes multipart e limites efetivos definidos pelo backend.
-- **Contatos, atendimento, contratos, parcelas, pagamentos e relatórios:** não foram encontrados controladores, DTOs ou contratos desses domínios na árvore atual da API. O backend precisa definir esses recursos antes do desenvolvimento das telas.
+- **Sessão:** `POST /auth/login` retorna `{ token, perfil }`. O perfil do front-end é usado para navegação; a API valida cada operação.
+- **Usuários:** `GET /usuario`, `GET /usuario/{id}`, `PUT /usuario/{id}` e `PATCH /usuario/{id}/situacao` permitem consulta e gestão por administrador ou gestor, com escopo de empresa para gestor. `PATCH /usuario/senha` altera a senha da própria conta autenticada.
+- **Corretores:** o gestor consulta a equipe pelos endpoints de ativos/inativos, cadastra, edita e ativa/desativa somente corretores da própria empresa. Edição profissional não altera senha nem foto.
+- **Tipos de cadastro de corretor:** `POST /empresa/autonoma` cadastra uma empresa autônoma junto com o corretor proprietário; `POST /corretor` cadastra um corretor vinculado à imobiliária do gestor. O formulário geral mantém esses cadastros separados.
+- **Proprietários:** o corretor ativo pesquisa, cadastra e atualiza proprietários dentro do escopo da empresa.
+- **Prédios e imóveis:** corretor e gestor consultam a lista/detalhe de imóveis da própria empresa e atualizam os dados comuns por `PUT /imovel/{id}`. A gestão do imóvel permite publicação, situação e histórico; criação de imóvel e gestão de prédios seguem as permissões documentadas.
+- **Loteamentos e lotes:** corretor e gestor consultam loteamentos e lotes por quadra. Cadastro de loteamento/quadra permanece restrito ao corretor; mudança de situação do lote exige gestor e observação.
+- **Documentos e imagens:** o gestor consulta, inclui, substitui e baixa documentos do imóvel. Não existe operação de remoção de documento. As rotas de imagem permitem gestão conforme perfil e vínculo empresarial.
+- **Contexto da empresa:** `GET /empresa/atual` retorna a empresa vinculada ao gestor e os dados necessários para administrar sua própria logomarca.
+- **Contatos:** corretor e gestor consultam a caixa autorizada; filtros aceitos são `imovelId`, `dataInicio` e `dataFim`. Apenas o corretor responsável pode atualizar `retorno`. O registro público de contato pertence à vitrine, fora deste painel.
+- **Contratos, parcelas/pagamentos e relatórios:** não foram encontrados controladores ou DTOs desses domínios na API consultada. T-11 permanece fora deste escopo conforme solicitado; T-12 e T-13 aguardam contrato da API.
+- **Cidades:** `GET /cidade` retorna o catálogo geral, sem filtro pela área de atuação da empresa. O servidor valida o escopo ao gravar; a API ainda precisa expor as cidades elegíveis para evitar opções que serão recusadas.
 
-As conclusões sobre ausência de endpoints referem-se ao código/documentação disponíveis no repositório da API no levantamento acima. Revalidar esse inventário antes de iniciar cada integração, pois o backend pode evoluir.
+Este inventário foi conferido no repositório e na documentação local da API em 24/11/2026. Revalidar os contratos antes de iniciar integrações futuras, pois o backend pode evoluir.
 
 ## 12. Plano de trabalho do front-end
 
@@ -423,52 +426,48 @@ Esta lista separa o que já existe no painel do que ainda falta fazer. O andamen
 - **Já feito:** administrador consulta, cria, edita, ativa, desativa e remove empresas; também gerencia logomarcas e os cadastros auxiliares disponíveis.
 - **Resultado esperado:** somente o administrador acessa essas operações; remoções dependem da confirmação da pessoa e do resultado da API.
 
-#### T-04 — Equipe de corretores — **Parcial; edição depende da API**
+#### T-04 — Equipe de corretores — **Concluída**
 
-- **Já feito:** gestor cadastra, consulta e ativa/desativa corretores da própria empresa. As listas usam `GET /corretor/empresa/ativos` e `GET /corretor/empresa/inativos`.
-- **Bloqueio:** a RF-05 também prevê editar os dados profissionais do corretor, mas a API não oferece operação de atualização. Não reutilizar o cadastro nem alterar dados localmente para contornar essa ausência.
-- **Resultado esperado:** somente corretores da empresa do gestor aparecem; as mudanças de situação usam IDs das listas autorizadas e refletem respostas da API.
+- **Implementado:** gestor consulta ativos e inativos da própria empresa, cadastra, edita dados profissionais e ativa/desativa cada corretor.
+- **Escopo da edição:** nome, e-mail, CRECI, telefone, WhatsApp e apresentação. Senha e foto mantêm operações próprias.
+- **Resultado:** situação e dados são recarregados da API após salvar; conflitos e erros permanecem visíveis.
 
-#### T-05 — Cadastro e administração de usuários — **Parcial; cadastros de corretor separados**
+#### T-05 — Cadastro e administração de usuários — **Concluída**
 
-- **Já feito:** administrador cria contas gerais pelos perfis compatíveis com `POST /auth/register`. O formulário não oferece `CORRETOR`, pois essa rota cria somente um usuário, sem o registro profissional.
-- **Já feito em fluxos próprios:** administrador cadastra o corretor autônomo junto com a empresa em Empresas; gestor cadastra corretores vinculados à imobiliária em Corretores. São operações distintas e permanecem disponíveis.
-- **Falta depois:** consulta, edição e alteração de situação de usuários quando a API oferecer essas operações. A gestão pelo gestor só deve ser incluída dentro do escopo autorizado.
-- **Resultado esperado:** contas gerais e cadastros profissionais são apresentados em fluxos separados, de acordo com seus contratos e permissões.
+- **Implementado:** administrador cria contas gerais; administrador e gestor listam, editam nome/e-mail e alteram situação dentro do escopo autorizado pela API.
+- **Troca de senha:** qualquer usuário autenticado aceito pela API pode alterar a própria senha confirmando a senha atual. A interface valida 12–255 caracteres e o limite de 72 bytes UTF-8.
+- **Cadastros profissionais:** corretor autônomo e corretor de imobiliária permanecem nos fluxos próprios; não são criados pelo formulário geral.
 
-#### T-06 — Consulta e cadastro de proprietários — **Parcial; edição depende de operação disponível**
+#### T-06 — Consulta e cadastro de proprietários — **Concluída**
 
-- **Já feito:** corretor pesquisa por nome ou documento e cadastra proprietários pessoa física ou jurídica.
-- **Falta no front:** oferecer edição quando houver uma operação de atualização disponível; não simular a alteração localmente.
-- **Resultado esperado:** dados e mensagens vêm da API; se uma gravação falhar, os demais campos preenchidos continuam disponíveis.
+- **Implementado:** corretor pesquisa por nome ou documento, cadastra pessoa física/jurídica e edita os dados pelo endpoint `PUT /proprietario/{id}`.
+- **Resultado:** a empresa não pode ser alterada no corpo enviado; erros preservam os valores do formulário.
 
-#### T-07 — Prédios e acervo de imóveis — **Parcial**
+#### T-07 — Prédios e acervo de imóveis — **Concluída**
 
-- **Já feito:** corretor consulta e detalha imóveis e prédios; cadastra prédios e imóveis das quatro naturezas usando os respectivos campos, proprietário, características, fotos e endereço.
-- **Falta no front agora:** oferecer edição de prédio usando `PUT /predio/{id}`.
-- **Falta depois:** apresentar ao gestor as ações de publicação, situação e histórico a partir de uma lista e de detalhes autorizados. A edição de dados comuns do imóvel não tem operação de atualização na API atual.
-- **Resultado esperado:** cada natureza envia somente seu bloco de DTO; situação e publicação mudam na tela somente após confirmação da API.
+- **Implementado:** corretor mantém consulta, cadastro e edição de prédios e imóveis. Corretor e gestor consultam e editam imóveis dentro da empresa autorizada.
+- **Gestão do imóvel pelo gestor:** alterar publicação e situação, consultar histórico e editar dados comuns com o bloco específico da natureza.
+- **Resultado:** situação e publicação só são consideradas atualizadas após resposta da API. A cidade existente é mantida durante a edição enquanto não houver lista de cidades autorizadas para escolha.
 
-#### T-08 — Loteamentos, quadras e lotes — **Parcial**
+#### T-08 — Loteamentos, quadras e lotes — **Concluída**
 
-- **Já feito:** corretor consulta a hierarquia e as contagens retornadas, cadastra loteamentos e quadras e inicia o cadastro de um lote na quadra escolhida.
-- **Falta no front depois:** oferecer ao gestor a consulta e a alteração de situação de lotes quando houver uma lista/detalhe autorizado para esse perfil.
-- **Resultado esperado:** situações e contagens são apresentadas como retornadas pela API; o front não calcula disponibilidade nem simula transições.
+- **Implementado:** corretor consulta e cadastra loteamentos/quadras e cadastra lote na quadra selecionada; gestor consulta lotes por quadra e solicita a mudança de situação com observação.
+- **Resultado:** contagens e situações vêm da API. O gestor não recebe ações de criação de loteamento, quadra ou lote, pois esses cadastros permanecem com o corretor.
 
-#### T-09 — Fotos e documentos — **Parcial**
+#### T-09 — Fotos, documentos e logomarca — **Concluída, sem remoção de documentos**
 
-- **Já feito:** administrador adiciona, substitui e remove logomarcas; corretor adiciona, substitui e remove fotos de imóveis, mantendo ao menos uma foto.
-- **Falta no front depois:** criar a área de documentos do imóvel para o gestor — listar, enviar, substituir e baixar — quando ele puder selecionar um imóvel autorizado. Incluir a logomarca da própria empresa na tela do gestor quando a sessão fornecer o contexto da empresa.
-- **Resultado esperado:** partes multipart, tipos, limites e operações seguem os contratos. Erros de envio não apagam dados já preenchidos. Não oferecer reordenação ou troca posterior de capa sem operação correspondente.
+- **Implementado:** gestão de fotos dos imóveis pelo corretor e de logomarcas de empresas pelo administrador; o gestor consulta o próprio contexto de empresa e administra a logomarca vinculada à sessão.
+- **Documentos do imóvel:** gestor lista, envia, substitui e baixa arquivos. Não há remoção na API, portanto a interface não oferece essa ação.
+- **Resultado:** formatos, limites, partes multipart e identificadores seguem o contrato efetivo.
 
-### Prioridade 2 — Funcionalidades que aguardam contrato
+#### T-10 — Contatos e atendimento — **Concluída**
+
+- **Implementado:** corretor e gestor consultam contatos autorizados e filtram por imóvel e intervalo de datas; o retorno é ordenado e exibido conforme a API.
+- **Permissões:** somente o corretor responsável registra o retorno (`FALEI`, `VISITA_AGENDADA`, `SEM_RESPOSTA` ou `DESCARTADO`); o gestor tem consulta da empresa sem ação de atualização.
+
+### Prioridade 2 — Funcionalidades que aguardam contrato da API
 
 As tarefas abaixo descrevem somente a parte futura do front. Não criar endpoints simulados nem dados falsos para concluí-las; iniciar cada interface quando houver contrato real para ela.
-
-#### T-10 — Contatos e atendimento — **Aguardando contrato**
-
-- **Falta no front quando disponível:** consultar contatos autorizados, filtrar pelos campos aceitos e registrar atendimentos usando os estados oficiais.
-- **Resultado esperado:** gestor e corretor veem apenas os dados permitidos; a tela cobre carregamento, vazio, erro e sucesso.
 
 #### T-11 — Contratos — **Aguardando contrato**
 
@@ -489,6 +488,6 @@ As tarefas abaixo descrevem somente a parte futura do front. Não criar endpoint
 
 #### T-14 — Estados, acessibilidade, responsividade e testes — **Parcial**
 
-- **Já feito:** há estilos responsivos, foco visível e estados de carregamento/erro em várias páginas. `npm test` cobre sessão, permissões, consultas do painel, DTOs de imóvel e multipart repetido.
-- **Falta no front:** revisar todas as telas por teclado e leitor de tela; conferir foco e modais em telas menores; uniformizar carregamento, vazio, sucesso, erro e falta de permissão; ampliar testes para formulários, rotas protegidas e respostas vazias.
+- **Já feito:** há estilos responsivos e foco visível; modais agora identificam o título, movem e mantêm o foco no diálogo, devolvem o foco ao acionador e impedem rolagem do fundo. Rotas sem permissão mostram uma mensagem clara; estados vazios e áreas de tabelas recebem rótulos acessíveis. Os testes cobrem perfis aceitos no painel, DTO e atualização de prédio, resposta vazia de lista, foco de modal, sessão, DTOs de imóvel e multipart.
+- **Falta no front:** revisar todas as telas por teclado e leitor de tela em navegador; conferir formulários e estados de carregamento, vazio, sucesso, erro e falta de permissão ponta a ponta em todos os perfis; ampliar testes de interação visual quando houver ambiente de DOM para isso.
 - **Resultado esperado:** ações principais funcionam por teclado; mensagens não dependem só de cor; formulários preservam dados após falha; os testes cobrem os fluxos críticos sem reproduzir regras de negócio da API.
