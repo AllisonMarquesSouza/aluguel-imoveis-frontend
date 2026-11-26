@@ -1,4 +1,4 @@
-const BASE = import.meta.env?.VITE_API_URL ?? '/api';
+const BASE = import.meta.env?.VITE_API_BASE_URL ?? import.meta.env?.VITE_API_URL ?? '/api';
 const KEY = 'mi_token';
 // Perfil persistido apenas para restaurar a navegação; a API autoriza cada operação.
 const PROFILE_KEY = 'mi_perfil';
