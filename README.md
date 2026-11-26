@@ -5,13 +5,13 @@ React + Vite, consumindo a Meu Imóvel API.
 ## Rodando
 ```bash
 npm install
-npm run dev        # http://localhost:5173
+npm run dev        # http://localhost:5174
 ```
-Em desenvolvimento, `/api/*` é repassado pelo Vite para `http://localhost:8080` (sem CORS).
-Para outra API: `VITE_PROXY_TARGET=http://host:porta npm run dev`.
+O endereço da API é configurado em `VITE_API_BASE_URL` no arquivo `.env`.
+Para outra API, altere essa variável; a API deve permitir CORS para a origem do painel.
 
 ## Produção
-Defina `VITE_API_URL` com a URL pública da API e **libere CORS** nela para o domínio do painel.
+Defina `VITE_API_BASE_URL` com a URL pública da API e **libere CORS** nela para o domínio do painel.
 `npm run build` gera `dist/`.
 
 ## O que já tem
