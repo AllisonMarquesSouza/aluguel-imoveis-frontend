@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { api } from '../api.js';
+import { buildOwnerSearchPath } from '../owner-data.js';
 import { Field, Modal, useToast } from '../ui.jsx';
 
 const EMPTY = {
@@ -26,8 +27,8 @@ export default function Proprietarios() {
 
   async function search(event) {
     event?.preventDefault();
-    if (!query.trim()) {
-      setError(mode === 'nome' ? 'Informe um nome para pesquisar.' : 'Informe um documento para pesquisar.');
+    if (mode === 'documento' && !query.trim()) {
+      setError('Informe um documento para pesquisar.');
       setResults(null);
       return;
     }
@@ -36,7 +37,7 @@ export default function Proprietarios() {
     setError('');
     try {
       if (mode === 'nome') {
-        const data = await api.get(`/proprietario?nome=${encodeURIComponent(query.trim())}`);
+        const data = await api.get(buildOwnerSearchPath(query));
         if (!Array.isArray(data)) throw new Error('A API retornou um formato inesperado.');
         setResults(data);
       } else {
@@ -61,7 +62,7 @@ export default function Proprietarios() {
     const matchesCurrentSearch = mode === 'nome'
       ? owner.nome.toLowerCase().includes(query.trim().toLowerCase())
       : normalizeDocument(owner.documento) === normalizeDocument(query);
-    if (query.trim() && matchesCurrentSearch) await search();
+    if ((mode === 'nome' && !query.trim()) || (query.trim() && matchesCurrentSearch)) await search();
   }
 
   return (
@@ -89,8 +90,11 @@ export default function Proprietarios() {
             </select>
           </Field>
         )}
-        <Field label={mode === 'nome' ? 'Nome ou trecho do nome' : 'CPF ou CNPJ'}>
-          <input value={query} onChange={(event) => setQuery(event.target.value)} required />
+        <Field
+          label={mode === 'nome' ? 'Nome ou trecho do nome' : 'CPF ou CNPJ'}
+          hint={mode === 'nome' ? 'Deixe vazio e pesquise para listar todos os proprietários da sua empresa.' : undefined}
+        >
+          <input value={query} onChange={(event) => setQuery(event.target.value)} required={mode === 'documento'} />
         </Field>
         <button className="primary" disabled={busy}>{busy ? 'Pesquisando…' : 'Pesquisar'}</button>
       </form>

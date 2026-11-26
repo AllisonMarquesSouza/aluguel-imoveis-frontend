@@ -4,6 +4,7 @@ import { api, assetUrl, multipart } from '../api.js';
 import { useAuth } from '../auth.jsx';
 import { buildPropertyDto, buildPropertyUpdateDto } from '../property-data.js';
 import { buildBuildingDto, buildingFormFromResponse } from '../building-data.js';
+import SearchableMultiSelect from '../SearchableMultiSelect.jsx';
 import { Field, Modal, useToast } from '../ui.jsx';
 
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
@@ -366,9 +367,20 @@ function NewPropertyForm({ property = null, isManager = false, cities, features,
         {nature === 'LOTE' && <LotFields form={form} update={update} quadras={quadraOptions} />}
 
         {nature !== 'APARTAMENTO' && <AddressFields form={form} update={update} cities={addressCities} />}
-        <div className="span2">
-          <Field label="Características"><select multiple size={4} value={featureIds} onChange={(event) => setFeatureIds(Array.from(event.target.selectedOptions, (option) => option.value))}>{features.map((feature) => <option key={feature.id} value={feature.id}>{feature.nome}</option>)}</select></Field>
-        </div>
+        <SearchableMultiSelect
+          options={features.map((feature) => ({ id: feature.id, label: feature.nome }))}
+          label="Características"
+          hint="Busque pelo nome e marque as características do imóvel. Remova opções desmarcando-as ou usando “Limpar seleção”."
+          emptyMessage="Nenhuma característica cadastrada. Cadastre opções em Cadastros auxiliares."
+          searchLabel="Buscar característica"
+          searchPlaceholder="Buscar característica"
+          singularLabel="característica"
+          pluralLabel="características"
+          emptySelectionMessage="Nenhuma característica selecionada"
+          selectedListLabel="Características selecionadas"
+          value={featureIds}
+          onChange={setFeatureIds}
+        />
         <div className="span2"><Field label="Descrição (opcional)"><textarea rows={3} value={form.descricao} onChange={update('descricao')} /></Field></div>
         {!property && <div className="span2"><Field label="Fotos (JPEG, PNG ou WebP; até 5 MB cada)" hint="Envie ao menos uma foto. A API limita o arquivo individual a 5 MB."><input type="file" accept="image/jpeg,image/png,image/webp" multiple required onChange={choosePhotos} /></Field></div>}
         {!property && photos.length > 0 && <Field label="Foto de capa"><select value={coverOrder} onChange={(event) => setCoverOrder(event.target.value)}>{photos.map((photo, index) => <option key={`${photo.name}-${index}`} value={index + 1}>{index + 1} · {photo.name}</option>)}</select></Field>}
