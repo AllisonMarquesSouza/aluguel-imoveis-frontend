@@ -6,16 +6,16 @@ function normalize(value) {
     .trim();
 }
 
-export function filterCities(cities, query) {
+export function filterOptions(options, query) {
   const term = normalize(query);
-  if (!term) return cities;
+  if (!term) return options;
 
-  return cities.filter((city) => normalize(`${city.nome} ${city.uf}`).includes(term));
+  return options.filter((option) => normalize(`${option.label} ${option.detail ?? ''}`).includes(term));
 }
 
-export function toggleCitySelection(currentIds, cityId, checked) {
+export function toggleSelection(currentIds, optionId, checked) {
   const selected = new Set((currentIds ?? []).map(String));
-  const id = String(cityId);
+  const id = String(optionId);
 
   if (checked) selected.add(id);
   else selected.delete(id);

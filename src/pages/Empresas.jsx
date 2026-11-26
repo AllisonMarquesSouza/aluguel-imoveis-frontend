@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api, assetUrl, multipart } from '../api.js';
 import { Field, Modal, useToast } from '../ui.jsx';
-import CityMultiSelect from '../CityMultiSelect.jsx';
+import SearchableMultiSelect from '../SearchableMultiSelect.jsx';
 
 const EMPTY_EMPRESA = {
   nome: '',
@@ -325,11 +325,17 @@ function EmpresaForm({ cities, onClose, onDone }) {
             {cities.map((city) => <option key={city.id} value={city.id}>{city.nome} · {city.uf}</option>)}
           </select>
         </Field>
-        <CityMultiSelect
+        <SearchableMultiSelect
+          options={cities.map((city) => ({ id: city.id, label: city.nome, detail: city.uf }))}
           label="Cidades de atuação"
           hint={cities.length ? 'Busque pelo nome ou UF e marque uma ou mais cidades. Para remover, desmarque ou use “Limpar seleção”.' : 'Cadastre cidades em Cadastros auxiliares antes de criar a empresa.'}
           emptyMessage="Nenhuma cidade cadastrada. Cadastre uma cidade em Cadastros auxiliares antes de continuar."
-          cities={cities}
+          searchLabel="Buscar cidade por nome ou UF"
+          searchPlaceholder="Buscar cidade ou UF"
+          singularLabel="cidade"
+          pluralLabel="cidades"
+          emptySelectionMessage="Nenhuma cidade selecionada"
+          selectedListLabel="Cidades selecionadas"
           value={empresa.cidadesAtuacaoIds}
           onChange={(cidadesAtuacaoIds) => setEmpresa((current) => ({ ...current, cidadesAtuacaoIds }))}
         />
@@ -447,11 +453,17 @@ function EditarEmpresa({ company, cities, onClose, onDone }) {
             {cities.map((city) => <option key={city.id} value={city.id}>{city.nome} · {city.uf}</option>)}
           </select>
         </Field>
-        <CityMultiSelect
+        <SearchableMultiSelect
+          options={cities.map((city) => ({ id: city.id, label: city.nome, detail: city.uf }))}
           label="Cidades de atuação"
           hint="Busque pelo nome ou UF e marque as cidades que a empresa atende. Remova opções desmarcando-as ou usando “Limpar seleção”."
           emptyMessage="Não foi possível carregar cidades. Tente novamente antes de alterar a área de atuação."
-          cities={cities}
+          searchLabel="Buscar cidade por nome ou UF"
+          searchPlaceholder="Buscar cidade ou UF"
+          singularLabel="cidade"
+          pluralLabel="cidades"
+          emptySelectionMessage="Nenhuma cidade selecionada"
+          selectedListLabel="Cidades selecionadas"
           value={form.cidadesAtuacaoIds}
           onChange={(cidadesAtuacaoIds) => setForm((current) => ({ ...current, cidadesAtuacaoIds }))}
         />
